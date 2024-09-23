@@ -49,7 +49,45 @@ typedef struct
 
  --------------------------------------------------------*/
 
-__global__ void CheckR_1D(char *d_targetArray, int* radius, int *d_Size, long int *d_InterfaceArray)
+__global__ void CheckR_D(char *d_targetArray, int* radius, int *d_Size, long int *d_InterfaceArray)
+{
+    long int myIdx = d_InterfaceArray[blockIdx.x];
+    int height, width, depth;
+    int myRow, myCol, mySlice;
+
+    height = d_Size[0];
+    width = d_Size[1];
+    depth = d_Size[2];
+
+    mySlice = myIdx/(height*width);
+    myRow = (myIdx - mySlice*height*width)/width;
+    myCol = (myIdx - mySlice*height*width - myRow*width);
+
+    int r = radius[0];
+    int rk = (threadIdx.x - r) + mySlice;
+    if (rk < 0 || rk > depth - 1) return;
+    
+
+    for(int ri = myRow - r; ri <= myRow + r; ri++){
+        if (ri < 0 || ri > height - 1) continue;
+        for(int rj = myCol - r; rj <= myCol + r; rj++){
+            if (rj < 0 || rj > width - 1) continue;
+
+            if(pow(rk-mySlice,2) + pow(rj - myCol,2) + pow(ri - myRow,2) <= pow(r, 2))
+            {
+                // if(rk*width*height + ri*width + rj == 22){
+                //     printf("ThreadIdk = %d, ri = %d, rj = %d, rk = %d, myIdx = %ld\n", threadIdx.x, ri, rj, rk, myIdx);
+                //     printf("ThreadIdk = %d, Row = %d, Col = %d, Slice = %d, myIdx = %ld\n", threadIdx.x, myRow, myCol, mySlice, myIdx);
+                // }
+                d_targetArray[rk*width*height + ri*width + rj] = 0;
+            }
+        }
+    }
+
+    return;
+}
+
+__global__ void CheckR_E(char *d_targetArray, int* radius, int *d_Size, long int *d_InterfaceArray)
 {
     long int myIdx = d_InterfaceArray[blockIdx.x];
 
@@ -69,20 +107,19 @@ __global__ void CheckR_1D(char *d_targetArray, int* radius, int *d_Size, long in
     if (rk < 0 || rk > depth - 1) return;
 
     for(int ri = myRow - r; ri <= myRow + r; ri++){
-        if (ri < 0 || ri > height) continue;
+        if (ri < 0 || ri > height - 1) continue;
         for(int rj = myCol - r; rj <= myCol + r; rj++){
-            if (rj < 0 || rj > width) continue;
+            if (rj < 0 || rj > width - 1) continue;
 
             if(pow(rk-mySlice,2) + pow(rj - myCol,2) + pow(ri - myRow,2) <= pow(r, 2))
             {
-                d_targetArray[rk*width*height + ri*width + rj] = 0;
+                d_targetArray[rk*width*height + ri*width + rj] = 1;
             }
         }
     }
 
     return;
 }
-
 /*--------------------------------------------------------
     
         Functions
@@ -111,7 +148,7 @@ int main(void){
     --------------------------------------------------------*/
 
     // OMP options
-    int num_threads = 1;
+    int num_threads = 8;
     omp_set_num_threads(num_threads);
     
     // Flags
@@ -153,7 +190,6 @@ int main(void){
 
     char *P = (char *)malloc(sizeof(char)*max_size);
     char *D = (char *)malloc(sizeof(char)*max_size);
-    char *D_test= (char *)malloc(sizeof(char)*max_size);
     char *E = (char *)malloc(sizeof(char)*max_size);
 
     long int *h_InterfaceArray = (long int *)malloc(sizeof(long int)*max_size);
@@ -259,7 +295,6 @@ int main(void){
 
     char *d_P, *d_E, *d_D;
     long int *d_InterfaceArray;
-    int *d_InterfaceNum, *debugNum;
     int *d_R;
     int *d_Size;
 
@@ -270,8 +305,6 @@ int main(void){
     CHECK_CUDA( cudaMalloc((void **) &d_D, max_size*sizeof(char)));
     CHECK_CUDA( cudaMalloc((void **) &d_InterfaceArray, max_size*sizeof(long int)));
 
-    CHECK_CUDA( cudaMalloc((void **) &d_InterfaceNum, sizeof(int)));
-    CHECK_CUDA( cudaMalloc((void **) &debugNum, sizeof(int)));
     CHECK_CUDA( cudaMalloc((void **) &d_R, sizeof(int)));
     CHECK_CUDA( cudaMalloc((void **) &d_Size, 3*sizeof(int)));
 
@@ -281,26 +314,9 @@ int main(void){
     CHECK_CUDA( cudaMemcpy(d_E, P, max_size*sizeof(char), cudaMemcpyHostToDevice));
     CHECK_CUDA( cudaMemcpy(d_D, P, max_size*sizeof(char), cudaMemcpyHostToDevice));
 
-    CHECK_CUDA( cudaMemset(d_InterfaceNum, 0, sizeof(int)));
-    CHECK_CUDA( cudaMemset(debugNum, 0, sizeof(int)));
     CHECK_CUDA( cudaMemset(d_InterfaceArray, 0, max_size*sizeof(long int)));
     CHECK_CUDA( cudaMemcpy(d_Size, size, 3*sizeof(int), cudaMemcpyHostToDevice));
     CHECK_CUDA( cudaMemcpy(d_R, &radius, sizeof(int), cudaMemcpyHostToDevice));
-
-    // CheckR_1D<<<num_blocks, threads_per_block>>>(d_D, d_R, d_Size, debugNum, d_InterfaceArray);
-
-    // DilateInterface<<<num_blocks, threads_per_block>>>(d_InterfaceArray, d_InterfaceNum, d_D, d_R, d_Size, debugNum);
-
-    // debug
-    // int h_debugNum = 0;
-    // CHECK_CUDA( cudaMemcpy(&h_debugNum, debugNum, sizeof(int), cudaMemcpyDeviceToHost));
-    // printf("Debug num = %d\n", h_debugNum);
-
-    // continue
-
-    // CHECK_CUDA( cudaMemcpy(D_test, d_D, max_size * sizeof(char), cudaMemcpyDeviceToHost));
-
-    // e_sum = 0;
 
     interfaceCount = 0;
 
@@ -316,90 +332,68 @@ int main(void){
         // Copy P into dilation array
 
         memcpy(D, P, sizeof(char)*max_size);
+        CHECK_CUDA( cudaMemcpy(d_D, d_P, sizeof(char)*max_size, cudaMemcpyDeviceToDevice));
 
         // search entire array
 
         int row, col, slice;
         bool interfaceFlag;
         long int temp_index;
-        long int myCount;
-        #pragma omp parallel for schedule(auto) private(myCount)
+        #pragma omp parallel for schedule(auto) private(row, col, slice, interfaceFlag, temp_index)
         for(long int i = 0; i<max_size; i++)
         {
-            if (P[i] == 0)
+            if (P[i] != 0) continue;
+            interfaceFlag = false;                          // false until proven otherwise
+            slice = i/(height*width);
+            row = (i - slice*height*width)/width;
+            col = (i - slice*height*width - row*width);
+
+            // Need to find out if this is an interface
+
+            if(slice != 0)
             {
-                interfaceFlag = false;                          // false until proven otherwise
-                slice = i/(height*width);
-                row = (i - slice*height*width)/width;
-                col = (i - slice*height*width - row*width);
+                temp_index = i - height*width;
+                if (P[i] != P[temp_index]) interfaceFlag = true;
+            }
 
-                // Need to find out if this is an interface
+            if(slice != depth - 1)
+            {
+                temp_index = i + height*width;
+                if(P[i] != P[temp_index]) interfaceFlag = true;
+            }
 
-                if(slice != 0)
-                {
-                    temp_index = i - height*width;
-                    if (P[i] != P[temp_index]) interfaceFlag = true;
-                }
+            if (row != 0)
+            {
+                temp_index = i - width;
+                if( P[i] != P[temp_index]) interfaceFlag = true;
+            }
 
-                if(slice != depth - 1)
-                {
-                    temp_index = i + height*width;
-                    if(P[i] != P[temp_index]) interfaceFlag = true;
-                }
+            if (row != height - 1)
+            {
+                temp_index = i + width;
+                if( P[i] != P[temp_index]) interfaceFlag = true;
+            }
 
-                if (row != 0)
-                {
-                    temp_index = i - width;
-                    if( P[i] != P[temp_index]) interfaceFlag = true;
-                }
+            if(col != 0)
+            {
+                temp_index = i - 1;
+                if( P[i] != P[temp_index]) interfaceFlag = true;
+            }
 
-                if (row != height - 1)
-                {
-                    temp_index = i + width;
-                    if( P[i] != P[temp_index]) interfaceFlag = true;
-                }
+            if(col != width - 1)
+            {
+                temp_index = i + 1;
+                if( P[i] != P[temp_index]) interfaceFlag = true;
+            }
 
-                if(col != 0)
-                {
-                    temp_index = i - 1;
-                    if( P[i] != P[temp_index]) interfaceFlag = true;
-                }
+            // Continue if it is not an interface
 
-                if(col != width - 1)
-                {
-                    temp_index = i + 1;
-                    if( P[i] != P[temp_index]) interfaceFlag = true;
-                }
+            if (!interfaceFlag) continue;
 
-                // Continue if it is not an interface
-
-                if (!interfaceFlag) continue;
-
-                #pragma omp capture
-                myCount = interfaceCount;
-                #pragma omp atomic write
+            #pragma omp critical
+            {
                 h_InterfaceArray[interfaceCount] = i;
-
-                #pragma omp atomic update
                 interfaceCount++;
-
-                // it is an interface, so we must scan a radius around it
-
-                for(int rk = slice - radius; rk <= slice + radius; rk++){
-                    if(rk < 0 || rk > depth - 1) continue;
-                    for(int ri = row - radius; ri <= row + radius; ri++){
-                        if(ri < 0 || ri > height - 1) continue;
-                        for(int rj = col - radius; rj <= col + radius; rj++){
-                            if(rj < 0 || rj > width - 1) continue;
-
-                            if(pow(rk-slice,2) + pow(rj-col,2) + pow(ri - row,2) <= pow(radius, 2))
-                            {
-                                D[rk*height*width + ri*width + rj] = 0;
-                            }
-                            
-                        }
-                    }
-                }
             }
         }
 
@@ -408,26 +402,10 @@ int main(void){
         num_blocks = interfaceCount;
         threads_per_block = 2*radius + 1;
 
-        CHECK_CUDA( cudaMemcpy(d_InterfaceArray, d_InterfaceArray, sizeof(long int)*max_size, cudaMemcpyHostToDevice) );
+        CHECK_CUDA( cudaMemcpy(d_InterfaceArray, h_InterfaceArray, sizeof(long int)*max_size, cudaMemcpyHostToDevice) );
 
 
-        CheckR_1D<<<num_blocks, threads_per_block>>>(d_D, d_R, d_Size, d_InterfaceArray);
-
-        printf("Interface count = %ld\n", interfaceCount);
-
-        CHECK_CUDA( cudaMemcpy(D_test, d_D, sizeof(char)*max_size, cudaMemcpyDeviceToHost) );
-
-        // printf("Interface count = %ld\n", interfaceCount);
-
-        for(int i = 0; i < max_size; i++)
-        {
-            if (D[i] != D_test[i]){
-                printf("Error at i = %d\n", i);
-                break;
-            }
-        }
-
-        printf("Comparison complete, D = D_test\n");
+        CheckR_D<<<num_blocks, threads_per_block>>>(d_D, d_R, d_Size, d_InterfaceArray);
 
         /*--------------------------------------------------------
     
@@ -436,90 +414,102 @@ int main(void){
         --------------------------------------------------------*/
         // Copy D into E
 
+        CHECK_CUDA( cudaMemcpy(D, d_D, sizeof(char)*max_size, cudaMemcpyDeviceToHost));
         memcpy(E, D, sizeof(char)*max_size);
+        CHECK_CUDA( cudaMemcpy(d_E, d_D, sizeof(char)*max_size, cudaMemcpyDeviceToDevice));
+
+        // reset base variables for the new loop
+
+        interfaceCount = 0;
+        memset(h_InterfaceArray, 0, sizeof(long int)*max_size);
+        CHECK_CUDA( cudaMemset(d_InterfaceArray, 0, sizeof(long int)*max_size));
 
         // Erosion
+        #pragma omp parallel for schedule(auto) private(row, col, slice, interfaceFlag, temp_index)
         for(long int i = 0; i<max_size; i++)
         {
-            if (D[i] == 1)
+            if (D[i] != 1) continue;
+
+            interfaceFlag = false;                          // false until proven otherwise
+            slice = i/(height*width);
+            row = (i - slice*height*width)/width;
+            col = (i - slice*height*width - row*width);
+
+            // Need to find out if this is an interface
+
+            if(slice != 0)
             {
-                interfaceFlag = false;                          // false until proven otherwise
-                slice = i/(height*width);
-                row = (i - slice*height*width)/width;
-                col = (i - slice*height*width - row*width);
+                temp_index = i - height*width;
+                if (D[i] != D[temp_index]) interfaceFlag = true;
+            }
 
-                // Need to find out if this is an interface
+            if(slice != depth - 1)
+            {
+                temp_index = i + height*width;
+                if(D[i] != D[temp_index]) interfaceFlag = true;
+            }
 
-                if(slice != 0)
-                {
-                    temp_index = i - height*width;
-                    if (D[i] != D[temp_index]) interfaceFlag = true;
-                }
+            if (row != 0)
+            {
+                temp_index = i - width;
+                if( D[i] != D[temp_index]) interfaceFlag = true;
+            }
 
-                if(slice != depth - 1)
-                {
-                    temp_index = i + height*width;
-                    if(D[i] != D[temp_index]) interfaceFlag = true;
-                }
+            if (row != height - 1)
+            {
+                temp_index = i + width;
+                if( D[i] != D[temp_index]) interfaceFlag = true;
+            }
 
-                if (row != 0)
-                {
-                    temp_index = i - width;
-                    if( D[i] != D[temp_index]) interfaceFlag = true;
-                }
+            if(col != 0)
+            {
+                temp_index = i - 1;
+                if( D[i] != D[temp_index]) interfaceFlag = true;
+            }
 
-                if (row != height - 1)
-                {
-                    temp_index = i + width;
-                    if( D[i] != D[temp_index]) interfaceFlag = true;
-                }
+            if(col != width - 1)
+            {
+                temp_index = i + 1;
+                if( D[i] != D[temp_index]) interfaceFlag = true;
+            }
 
-                if(col != 0)
-                {
-                    temp_index = i - 1;
-                    if( D[i] != D[temp_index]) interfaceFlag = true;
-                }
-
-                if(col != width - 1)
-                {
-                    temp_index = i + 1;
-                    if( D[i] != D[temp_index]) interfaceFlag = true;
-                }
-
-                // Continue if it is not an interface
-
-                if (!interfaceFlag) continue;
-
-                // it is an interface, so we must scan a radius around it
-
-                for(int rk = slice - radius; rk <= slice + radius; rk++){
-                    if(rk < 0 || rk > depth - 1) continue;
-                    for(int ri = row - radius; ri <= row + radius; ri++){
-                        if(ri < 0 || ri > height - 1) continue;
-                        for(int rj = col - radius; rj <= col + radius; rj++){
-                            if(rj < 0 || rj > width - 1) continue;
-
-                            if(pow(rk-slice,2) + pow(rj-col,2) + pow(ri - row,2) <= pow(radius, 2)) E[rk*height*width + ri*width + rj] = 1;
-                        }
-                    }
-                }
+            #pragma omp critical
+            {
+                h_InterfaceArray[interfaceCount] = i;
+                interfaceCount++;
             }
         }
+
+        // GPU Operations
+
+        num_blocks = interfaceCount;
+
+        CHECK_CUDA( cudaMemcpy(d_InterfaceArray, h_InterfaceArray, sizeof(long int)*max_size, cudaMemcpyHostToDevice) );
+
+        CheckR_E<<<num_blocks, threads_per_block>>>(d_E, d_R, d_Size, d_InterfaceArray);
+
+        CHECK_CUDA( cudaMemcpy(E, d_E, sizeof(char)*max_size, cudaMemcpyDeviceToHost));
 
         p_sum = 0;
         e_sum = 0;
         d_sum = 0;
-
+        #pragma omp parallel for reduction(+:p_sum, d_sum, e_sum)
         for(int i = 0; i<max_size; i++){
             p_sum += P[i];
             d_sum += D[i];
             e_sum += E[i];
         }
 
+        // reset base variables for the new loop
+
+        interfaceCount = 0;
+        memset(h_InterfaceArray, 0, sizeof(long int)*max_size);
+        CHECK_CUDA( cudaMemset(d_InterfaceArray, 0, sizeof(long int)*max_size));
+
         if(debugFlag) printf("R = %d, P = %ld, E = %ld, D = %ld\n", radius, p_sum, e_sum, d_sum);
         fprintf(OUT, "%d,%ld,%ld,%ld\n", radius, p_sum, e_sum, d_sum);
-        // radius++;
-        radius = 1000;
+        radius++;
+        CHECK_CUDA( cudaMemcpy(d_R, &radius, sizeof(int), cudaMemcpyHostToDevice));
     }
 
     fclose(OUT);

@@ -147,9 +147,9 @@ void ParticleLabel3D(int rMin, int rMax, char *R, int *L, int *size)
 
     // read size
     int height, width, depth;
-    size[0] = height;
-    size[1] = width;
-    size[2] = depth;
+    height = size[0];
+    width = size[1];
+    depth = size[2];
     int max_size = height*depth*width;
     int myRow, myCol, mySlice;
     long int temp_index;
@@ -636,6 +636,12 @@ int main(void){
     }
 
     fclose(OUT);
+
+    // Label Particles
+
+    ParticleLabel3D(3, radius, R, L, size);
+
+    // save results
 
     FILE *Particle;
 

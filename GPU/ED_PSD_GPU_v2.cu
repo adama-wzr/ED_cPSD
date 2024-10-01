@@ -23,6 +23,7 @@
 #include <cuda.h>
 #include <stdbool.h>
 #include <omp.h>
+#include <list>
 
 /*--------------------------------------------------------
     
@@ -139,6 +140,119 @@ __global__ void CheckR_E(char *d_targetArray, int* radius, int *d_Size, long int
     }                                                                          \
 }
 
+void ParticleLabel3D(int rMin, int rMax, char *R, int *L, int *size)
+{
+    // open list
+    std::list<long int> oList;
+
+    // read size
+    int height, width, depth;
+    size[0] = height;
+    size[1] = width;
+    size[2] = depth;
+    int max_size = height*depth*width;
+    int myRow, myCol, mySlice;
+    long int temp_index;
+    int particleLabel = 0;
+
+    // create iterable radius and begin labelling
+
+    int r = rMin;
+
+    while (r <= rMax)       // main loop
+    {
+        for(int i = 0; i<max_size; i++)
+        {
+            if (R[i] != r || L[i] != -1) continue;
+
+            // Label L[i] accordingly and add it to scan list
+
+            L[i] = particleLabel;
+
+            oList.push_back(i);
+            while(!oList.empty())       // Flood-Fill search starting from this label alone
+            {
+                // pop first index on the list and erase it
+                long int index = *oList.begin();
+                oList.erase(oList.begin());
+
+                // decode index
+
+                mySlice = index/(height*width);
+                myRow = (index - mySlice*height*width)/width;
+                myCol = (index - mySlice*height*width - myRow*width);
+
+                // Search Neighbords with the same r
+
+                if(mySlice != 0)
+                {
+                    temp_index = index - height*width;
+                    if(L[temp_index] == -1 && R[temp_index] == r)
+                    {
+                        oList.push_back(temp_index);
+                        L[temp_index] = particleLabel;
+                    }
+                }
+
+                if(mySlice != depth - 1)
+                {
+                    temp_index = index + height*width;
+                    if(L[temp_index] == -1 && R[temp_index] == r)
+                    {
+                        oList.push_back(temp_index);
+                        L[temp_index] = particleLabel;
+                    }
+                }
+
+                if(myRow != 0)
+                {
+                    temp_index = index - width;
+                    if(L[temp_index] == -1 && R[temp_index] == r)
+                    {
+                        oList.push_back(temp_index);
+                        L[temp_index] = particleLabel;
+                    }
+                }
+
+                if(myRow != height - 1)
+                {
+                    temp_index = index + width;
+                    if(L[temp_index] == -1 && R[temp_index] == r)
+                    {
+                        oList.push_back(temp_index);
+                        L[temp_index] = particleLabel;
+                    }
+                }
+
+                if(myCol != 0)
+                {
+                    temp_index = index - 1;
+                    if(L[temp_index] == -1 && R[temp_index] == r)
+                    {
+                        oList.push_back(temp_index);
+                        L[temp_index] = particleLabel;
+                    }
+                }
+
+                if(myCol != width - 1)
+                {
+                    temp_index = index + 1;
+                    if(L[temp_index] == -1 && R[temp_index] == r)
+                    {
+                        oList.push_back(temp_index);
+                        L[temp_index] = particleLabel;
+                    }
+                }
+
+            }   // end inner while
+            particleLabel++;        // push label increment
+        }   // end for
+        r++;                        // increase radius label
+    } // end while
+
+    return;
+}
+
 
 int main(void){
 
@@ -188,10 +302,11 @@ int main(void){
 
     // P holds the structure. E and D are essential for the operations
 
-    char *P = (char *)malloc(sizeof(char)*max_size);        // will always store the original image
-    char *D = (char *)malloc(sizeof(char)*max_size);        // array for the dilation operation
-    char *E = (char *)malloc(sizeof(char)*max_size);        // array for the erosion operation
-    char *R = (char *)malloc(sizeof(char)*max_size);        // array for particle identification
+    char *P = (char *)malloc(sizeof(char)* max_size);        // will always store the original image
+    char *D = (char *)malloc(sizeof(char)* max_size);        // array for the dilation operation
+    char *E = (char *)malloc(sizeof(char)* max_size);        // array for the erosion operation
+    char *R = (char *)malloc(sizeof(char)* max_size);        // array for particle identification
+    int  *L = (int *) malloc(sizeof(int) * max_size);        // array for particle labels
 
     long int *h_InterfaceArray = (long int *)malloc(sizeof(long int)*max_size);
 
@@ -268,7 +383,11 @@ int main(void){
         P[index] = 1;
     }
 
-    for(long int i = 0; i<max_size; i++) R[i] = -1;
+    for(long int i = 0; i<max_size; i++)
+    {
+        R[i] = -1;
+        L[i] = -1;
+    }
 
     // Free coordinate vectors, close file
 
@@ -520,8 +639,8 @@ int main(void){
 
     FILE *Particle;
 
-    Particle = fopen("test_particle_size.csv", "a+");
-    fprintf(Particle, "x,y,z,R\n");
+    Particle = fopen("test_particle_Label.csv", "a+");
+    fprintf(Particle, "x,y,z,R,L\n");
     int slice,row,col;
     for(int i = 0; i<max_size;i++){
         if(R[i]!=-1)
@@ -529,7 +648,7 @@ int main(void){
             slice = i/(height*width);
             row = (i - slice*height*width)/width;
             col = (i - slice*height*width - row*width);
-            fprintf(Particle,"%d,%d,%d,%d\n", col, row, slice, (int) R[i]);
+            fprintf(Particle,"%d,%d,%d,%d,%d\n", col, row, slice, (int) R[i], L[i]);
         } 
     }
     fclose(Particle);

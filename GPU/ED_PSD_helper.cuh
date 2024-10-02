@@ -15,7 +15,7 @@
 
 /*--------------------------------------------------------
     
-                    Constants
+                     Constants
 
  --------------------------------------------------------*/
 
@@ -35,10 +35,16 @@ typedef struct
     long int nElements;
 } sizeInfo;
 
+typedef struct
+{
+    int width;
+    int height;
+    long int nElements;
+} sizeInfo2D;
 
 /*--------------------------------------------------------
     
-        GPU Kernels
+                        GPU Kernels
 
  --------------------------------------------------------*/
 
@@ -196,6 +202,22 @@ int readCSV(char*           target_name,
 }
 
 
+int readImg_2D( char*           target_name,
+                unsigned char** targetPtr,
+                sizeInfo2D*     imgInfo)
+{
+    int channel;
+
+    *targetPtr = stbi_load(target_name, &imgInfo->width, &imgInfo->height, &channel, 1);
+
+    if (channel != 1) return 1;
+
+    imgInfo->nElements = imgInfo->height*imgInfo->width;
+
+    return 0;
+}
+
+
 int saveLabels3D(char*      P,
                  char*      R,
                  int*       L,
@@ -238,6 +260,88 @@ int saveLabels3D(char*      P,
     fclose(Particle);
     
     return 0;
+}
+
+
+long int FindInterface_2D(  char*           mainArray,
+                            long int*       InterfaceArray,
+                            sizeInfo2D*     structureInfo,
+                            int             primaryPhase,
+                            int             numThreads)
+{
+    // read data structure
+
+    int height, width;
+    
+    height = structureInfo->height;
+    width = structureInfo->width;
+    long int nElements = structureInfo->nElements;
+
+    long int interfaceCount = 0;
+
+    // set omp number of CPU threads to use
+
+    omp_set_num_threads(numThreads);
+
+    // Loop variables
+
+    int row, col;
+    bool interfaceFlag;
+    long int temp_index;
+
+    // main loop
+
+    #pragma omp parallel for schedule(auto) private(row, col, slice, interfaceFlag, temp_index)
+    for(long int i = 0; i<nElements; i++)
+    {
+        if(mainArray[i] != primaryPhase) continue;
+
+        interfaceFlag = false;                          // false until proven otherwise
+
+        // Decode index
+        row = i/width;
+        col = (i - row*width);
+
+        // Interface search
+
+        if (row != 0)
+        {
+            temp_index = i - width;
+            if( mainArray[i] != mainArray[temp_index]) interfaceFlag = true;
+        }
+
+        if (row != height - 1)
+        {
+            temp_index = i + width;
+            if( mainArray[i] != mainArray[temp_index]) interfaceFlag = true;
+        }
+
+        if(col != 0)
+        {
+            temp_index = i - 1;
+            if( mainArray[i] != mainArray[temp_index]) interfaceFlag = true;
+        }
+
+        if(col != width - 1)
+        {
+            temp_index = i + 1;
+            if( mainArray[i] != mainArray[temp_index]) interfaceFlag = true;
+        }
+
+        // Continue if it is not an interface
+
+        if (!interfaceFlag) continue;
+
+        #pragma omp critical
+        {
+            InterfaceArray[interfaceCount] = i;
+            interfaceCount++;
+        }
+
+    }
+
+
+    return interfaceCount;
 }
 
 
@@ -468,6 +572,122 @@ void ParticleLabel3D(   int             rMin,
 
  --------------------------------------------------------*/
 
+int Hybrid_particleSD_2D(char*          P,
+                         char*          E, 
+                         char*          D,
+                         char*          R, 
+                         long int*      InterfaceArray, 
+                         int            radius, 
+                         int            numThreads, 
+                         char*          output_name,
+                         sizeInfo2D*    structureInfo,
+                         bool           debugFlag)
+{
+    // read data structure
+    int height, width, depth;
+    height = structureInfo->height;
+    width = structureInfo->width;
+    long int nElements = structureInfo->nElements;
+
+    // loop variables
+
+    long int p_sum, d_sum, e_sum;
+    p_sum = 1;
+    e_sum = 1;
+    d_sum = 1;
+    int primaryPhase = 0;
+
+    int* size = (int *)malloc(sizeof(int)*2);
+    size[0] = height;
+    size[1] = width;
+
+    /*-------------------------------------------------------
+    
+                Declare/Define GPU Variables
+    
+    -------------------------------------------------------*/
+
+    // declare
+
+    char *d_P, *d_E, *d_D;
+    long int *d_InterfaceArray;
+    int *d_R;
+    int *d_Size;
+
+    // allocate the device space
+
+    CHECK_CUDA( cudaMalloc((void **) &d_P, nElements*sizeof(char)));
+    CHECK_CUDA( cudaMalloc((void **) &d_E, nElements*sizeof(char)));
+    CHECK_CUDA( cudaMalloc((void **) &d_D, nElements*sizeof(char)));
+    CHECK_CUDA( cudaMalloc((void **) &d_InterfaceArray, nElements*sizeof(long int)));
+
+    CHECK_CUDA( cudaMalloc((void **) &d_R, sizeof(int)));
+    CHECK_CUDA( cudaMalloc((void **) &d_Size, 2*sizeof(int)));
+
+    // Define
+
+    CHECK_CUDA( cudaMemcpy(d_P, P, nElements*sizeof(char), cudaMemcpyHostToDevice));
+    CHECK_CUDA( cudaMemcpy(d_E, P, nElements*sizeof(char), cudaMemcpyHostToDevice));
+    CHECK_CUDA( cudaMemcpy(d_D, P, nElements*sizeof(char), cudaMemcpyHostToDevice));
+
+    CHECK_CUDA( cudaMemset(d_InterfaceArray, 0, nElements*sizeof(long int)));
+    CHECK_CUDA( cudaMemcpy(d_Size, size, 2*sizeof(int), cudaMemcpyHostToDevice));
+    CHECK_CUDA( cudaMemcpy(d_R, &radius, sizeof(int), cudaMemcpyHostToDevice));
+
+    /*-------------------------------------------------------
+    
+                        Main Loop
+    
+    -------------------------------------------------------*/
+
+
+    // Open output file
+
+    FILE *OUT;
+
+    OUT = fopen(output_name, "w+");
+    fprintf(OUT, "R,P,E,D\n");
+
+    long int interfaceCount = 0;
+
+    while (e_sum != 0 && radius < MAX_R )
+    {
+        memcpy(D, P, sizeof(char)*nElements);       // copy P into D
+        CHECK_CUDA( cudaMemcpy(d_D, d_P, sizeof(char)*nElements, cudaMemcpyDeviceToDevice));
+
+        primaryPhase = 0;
+
+        // Find interfaces:
+
+        interfaceCount = FindInterface_2D(P, InterfaceArray, structureInfo, primaryPhase, numThreads);
+
+        // Calculate number of blocks and threads per block based on radius
+
+        int num_blocks, threads_per_block;
+
+        num_blocks = interfaceCount;
+        threads_per_block = 2*radius + 1;
+
+        // Copy interface array into the GPU
+
+        CHECK_CUDA( cudaMemcpy(d_InterfaceArray, InterfaceArray, sizeof(long int)*nElements, cudaMemcpyHostToDevice) );
+
+        // Do Dilation on GPU
+
+        
+
+
+    }
+
+
+    
+
+
+
+
+    return radius;
+}
+
 int Hybrid_particleSD_3D(char*      P,
                          char*      E, 
                          char*      D,
@@ -675,6 +895,121 @@ int ParticleSizeDist2D(bool debugMode)
         printf("               (Debug Mode)\n\n");
         printf("------------------------------------------------\n\n");
     }
+    /*---------------------------------------------------------------------
+    
+                            Read Input
+                                &
+                          Declare Arrays 
+
+        Input mode flags:
+        - Flag = 0 means jpg image (using stb image).
+        - Flag = 1 means tiff file.             (NOT IMPLEMENTED)
+
+    ------------------------------------------------------------------------*/
+
+    // User set variables
+
+    int radius_offset = 0;
+    int radius = 1;
+
+    unsigned char* target_img;
+    sizeInfo2D imgInfo;
+    char targetName[50];
+    char output_name[100];
+    bool saveLabels = true;
+
+    char labelsOutput_name[100];
+
+    // File names
+
+    sprintf(targetName, "00000.jpg");
+    sprintf(output_name, "00_ED_test.csv");
+
+    sprintf(labelsOutput_name, "Test_labels.csv");
+
+    // Parallel Computing Options Options
+
+    int numThreads = 8;                         // Number of CPU threads to be used
+
+    // Read image
+
+    if (readImg_2D( targetName, &target_img, &imgInfo) == 1) printf("Error, image has wrong number of channels\n");
+
+    char* P = (char *)malloc(sizeof(char)*imgInfo.nElements);
+
+    memset(P, 0, sizeof(char)*imgInfo.nElements);
+
+    // Cast image into P, free original array
+
+    for(int i = 0; i < imgInfo.nElements; i++)
+    {
+        if(target_img[i] < 150)
+        {
+            P[i] = 0;
+        }else
+        {
+            P[i] = 1;
+        }
+    }
+
+    free(target_img);
+
+    // Allocate Space for Erosion-Dilation
+
+    char *P = (char *)malloc(sizeof(char)*imgInfo.nElements);
+    char *E = (char *)malloc(sizeof(char)*imgInfo.nElements);
+    char *D = (char *)malloc(sizeof(char)*imgInfo.nElements);
+
+    // Initialize ED arrays
+
+    memset(P, 0, sizeof(char) * imgInfo.nElements);
+    memset(E, 0, sizeof(char) * imgInfo.nElements);
+    memset(D, 0, sizeof(char) * imgInfo.nElements);
+
+    // Label Arrays
+
+    char *R = (char *)malloc(sizeof(char)* imgInfo.nElements);        // array for particle radius
+    int  *L =  (int *)malloc(sizeof(int) * imgInfo.nElements);        // array for particle labels
+
+    // Interface array
+
+    long int *InterfaceArray = (long int *)malloc(sizeof(long int) * imgInfo.nElements);
+
+    // Initialize label arrays and Interface Array
+
+    memset(R,                0, sizeof(char)    * imgInfo.nElements);
+    memset(L,                0, sizeof(int)     * imgInfo.nElements);
+    memset(InterfaceArray,   0, sizeof(long int)* imgInfo.nElements);
+
+    if (debugMode) printf("Structure Read\n");
+
+    // Prepare variables for the main loop
+
+    for(long int i = 0; i<imgInfo.nElements; i++)
+    {
+        R[i] = -1;
+        L[i] = -1;
+    }
+
+    // set radius offset, if any
+
+    if(radius_offset > 0) radius = radius_offset;
+
+    /*---------------------------------------------------------------------
+    
+                            Main Loop
+
+    ------------------------------------------------------------------------*/
+
+    if (debugMode) printf("Starting Main Loop\n");
+
+    // radius = Hybrid_particleSD_3D(P, E, D, R, InterfaceArray, radius,
+    //                               numThreads, output_name, &structureInfo, debugMode);
+
+
+
+
+
     return 0;
 }
 
@@ -791,7 +1126,7 @@ int ParticleSizeDist3D(bool debugMode)
         L[i] = -1;
     }
 
-    if(radius_offset != 0) radius = radius_offset;
+    if(radius_offset > 0) radius = radius_offset;
 
     /*---------------------------------------------------------------------
     

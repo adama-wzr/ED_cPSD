@@ -8,6 +8,11 @@
 #include <omp.h>
 #include <list>
 
+// Load stb for reading jpg's
+
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
 /*--------------------------------------------------------
     
                     Constants
@@ -191,22 +196,34 @@ int readCSV(char*           target_name,
 }
 
 
-int saveLabels3D(char* P, char* R, int* L, sizeInfo* structureInfo, char* filename)
+int saveLabels3D(char*      P,
+                 char*      R,
+                 int*       L,
+                 sizeInfo*  structureInfo,
+                 char*      filename)
 {
     // read data structure
-    int height, width, depth;
+    int height, width;
+
     height = structureInfo->height;
     width = structureInfo->width;
-    depth = structureInfo->depth;
+    
     long int nElements = structureInfo->nElements;
+    
     // Open File
+    
     FILE *Particle;
 
     Particle = fopen(filename, "a+");
+
     fprintf(Particle, "x,y,z,R,L\n");
+    
     int slice,row,col;
+    
     // save everything
-    for(int i = 0; i<nElements;i++){
+    
+    for(int i = 0; i<nElements;i++)
+    {
         if(R[i]!=-1)
         {
             slice = i/(height*width);
@@ -215,16 +232,25 @@ int saveLabels3D(char* P, char* R, int* L, sizeInfo* structureInfo, char* filena
             fprintf(Particle,"%d,%d,%d,%d,%d\n", col, row, slice, (int) R[i], L[i]);
         } 
     }
+
     // close file
+    
     fclose(Particle);
+    
     return 0;
 }
 
 
-long int FindInterface_3D(char* mainArray, long int* InterfaceArray, sizeInfo* structureInfo, int primaryPhase, int numThreads)
+long int FindInterface_3D(  char*           mainArray,
+                            long int*       InterfaceArray,
+                            sizeInfo*       structureInfo,
+                            int             primaryPhase,
+                            int             numThreads)
 {
     // read data structure
+
     int height, width, depth;
+    
     height = structureInfo->height;
     width = structureInfo->width;
     depth = structureInfo->depth;
@@ -232,11 +258,18 @@ long int FindInterface_3D(char* mainArray, long int* InterfaceArray, sizeInfo* s
 
     long int interfaceCount = 0;
 
+    // set omp number of CPU threads to use
+
     omp_set_num_threads(numThreads);
+
+    // Loop variables
 
     int row, col, slice;
     bool interfaceFlag;
     long int temp_index;
+
+    // main loop
+
     #pragma omp parallel for schedule(auto) private(row, col, slice, interfaceFlag, temp_index)
     for(long int i = 0; i<nElements; i++)
     {
@@ -305,17 +338,27 @@ long int FindInterface_3D(char* mainArray, long int* InterfaceArray, sizeInfo* s
 }
 
 
-void ParticleLabel3D(int rMin, int rMax, char* R, int* L, sizeInfo* structureInfo)
+void ParticleLabel3D(   int             rMin,
+                        int             rMax,
+                        char*           R,
+                        int*            L,
+                        sizeInfo*       structureInfo)
 {
+
     // open list
+
     std::list<long int> oList;
 
     // read size
+
     int height, width, depth;
     height = structureInfo->height;
     width = structureInfo->width;
     depth = structureInfo->depth;
     long int nElements = structureInfo->nElements;
+
+    // Loop variables
+
     int myRow, myCol, mySlice;
     long int temp_index;
     int particleLabel = 0;
@@ -421,7 +464,7 @@ void ParticleLabel3D(int rMin, int rMax, char* R, int* L, sizeInfo* structureInf
 
 /*--------------------------------------------------------
     
-                    Main Functions
+                    Worker Functions
 
  --------------------------------------------------------*/
 
@@ -617,7 +660,11 @@ int Hybrid_particleSD_3D(char*      P,
     return radius;
 }
 
+/*--------------------------------------------------------
+    
+                    Parent Functions
 
+ --------------------------------------------------------*/
 
 int ParticleSizeDist2D(bool debugMode)
 {

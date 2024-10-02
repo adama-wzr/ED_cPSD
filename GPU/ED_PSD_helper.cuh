@@ -279,6 +279,48 @@ int readImg_2D( char*           target_name,
     return 0;
 }
 
+int saveLabels2D(char*          P,
+                 char*          R,
+                 int*           L,
+                 sizeInfo2D*    structureInfo,
+                 char*          filename)
+{
+    // read data structure
+    int height, width;
+
+    height = structureInfo->height;
+    width = structureInfo->width;
+    
+    long int nElements = structureInfo->nElements;
+    
+    // Open File
+    
+    FILE *Particle;
+
+    Particle = fopen(filename, "a+");
+
+    fprintf(Particle, "x,y,R,L\n");
+    
+    int row,col;
+    
+    // save everything
+    
+    for(int i = 0; i<nElements;i++)
+    {
+        if(R[i]!=-1)
+        {
+            row = i/width;
+            col = i - row*width;
+            fprintf(Particle,"%d,%d,%d,%d\n", col, row, (int) R[i], L[i]);
+        } 
+    }
+
+    // close file
+    
+    fclose(Particle);
+    
+    return 0;
+}
 
 int saveLabels3D(char*      P,
                  char*      R,
@@ -501,6 +543,108 @@ long int FindInterface_3D(  char*           mainArray,
 
 
     return interfaceCount;
+}
+
+
+void ParticleLabel2D(   int             rMin,
+                        int             rMax,
+                        char*           R,
+                        int*            L,
+                        sizeInfo2D*     structureInfo)
+{
+
+    // open list
+
+    std::list<long int> oList;
+
+    // read size
+
+    int height, width;
+    height = structureInfo->height;
+    width = structureInfo->width;
+    long int nElements = structureInfo->nElements;
+
+    // Loop variables
+
+    int myRow, myCol;
+    long int temp_index;
+    int particleLabel = 0;
+
+    // create iterable radius and begin labelling
+
+    int r = rMin;
+
+    while (r <= rMax)       // main loop
+    {
+        for(int i = 0; i<nElements; i++)
+        {
+            if (R[i] != r || L[i] != -1) continue;
+
+            // Label L[i] accordingly and add it to scan list
+
+            L[i] = particleLabel;
+
+            oList.push_back(i);
+            while(!oList.empty())       // Flood-Fill search starting from this label alone
+            {
+                // pop first index on the list and erase it
+                long int index = *oList.begin();
+                oList.erase(oList.begin());
+
+                // decode index
+
+                myRow = index/width;
+                myCol = index - myRow*width;
+
+                // Search Neighbords with the same r
+
+                if(myRow != 0)
+                {
+                    temp_index = index - width;
+                    if(L[temp_index] == -1 && R[temp_index] == r)
+                    {
+                        oList.push_back(temp_index);
+                        L[temp_index] = particleLabel;
+                    }
+                }
+
+                if(myRow != height - 1)
+                {
+                    temp_index = index + width;
+                    if(L[temp_index] == -1 && R[temp_index] == r)
+                    {
+                        oList.push_back(temp_index);
+                        L[temp_index] = particleLabel;
+                    }
+                }
+
+                if(myCol != 0)
+                {
+                    temp_index = index - 1;
+                    if(L[temp_index] == -1 && R[temp_index] == r)
+                    {
+                        oList.push_back(temp_index);
+                        L[temp_index] = particleLabel;
+                    }
+                }
+
+                if(myCol != width - 1)
+                {
+                    temp_index = index + 1;
+                    if(L[temp_index] == -1 && R[temp_index] == r)
+                    {
+                        oList.push_back(temp_index);
+                        L[temp_index] = particleLabel;
+                    }
+                }
+
+            }   // end inner while
+            particleLabel++;        // push label increment
+        }   // end for
+        r++;                        // increase radius label
+    } // end while
+
+    return;
 }
 
 
@@ -1063,7 +1207,7 @@ int ParticleSizeDist2D(bool debugMode)
     sprintf(targetName, "00000.jpg");
     sprintf(output_name, "00_ED_test.csv");
 
-    sprintf(labelsOutput_name, "Test_labels.csv");
+    sprintf(labelsOutput_name, "Test_labels2D.csv");
 
     // Parallel Computing Options Options
 
@@ -1143,9 +1287,32 @@ int ParticleSizeDist2D(bool debugMode)
                                   numThreads, output_name, &imgInfo, debugMode);
 
 
+    /*---------------------------------------------------------------------
+    
+                            Save Labels
 
+    ------------------------------------------------------------------------*/
 
+    if(saveLabels)
+    {
+        // Label Particles
 
+        ParticleLabel2D(3, radius, R, L, &imgInfo);
+        saveLabels2D(P, R, L, &imgInfo, labelsOutput_name);
+    }
+
+    /*---------------------------------------------------------------------
+    
+                            Memory Management
+
+    ------------------------------------------------------------------------*/
+
+    free(P);
+    free(E);
+    free(D);
+    free(InterfaceArray);
+    free(R);
+    free(L);
     return 0;
 }
 

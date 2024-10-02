@@ -48,6 +48,68 @@ typedef struct
 
  --------------------------------------------------------*/
 
+ __global__ void CheckR_D_2D(char *d_targetArray, int* radius, int *d_Size, long int *d_InterfaceArray)
+{
+    long int myIdx = d_InterfaceArray[blockIdx.x];
+    int height, width;
+    int myRow, myCol;
+
+    height = d_Size[0];
+    width = d_Size[1];
+
+    myRow = myIdx/width;
+    myCol = myIdx - myRow*width;
+
+    int r = radius[0];
+    int ri = (threadIdx.x - r) + myRow;
+    if (ri < 0 || ri > height - 1) return;
+
+    for(int rj = myCol - r; rj <= myCol + r; rj++)
+    {
+        if (rj < 0 || rj > width - 1) continue;
+
+        if(pow(rj - myCol,2) + pow(ri - myRow,2) <= pow(r, 2))
+        {
+            d_targetArray[ri*width + rj] = 0;
+        }
+
+    }
+
+    return;
+}
+
+
+ __global__ void CheckR_E_2D(char *d_targetArray, int* radius, int *d_Size, long int *d_InterfaceArray)
+{
+    long int myIdx = d_InterfaceArray[blockIdx.x];
+    int height, width;
+    int myRow, myCol;
+
+    height = d_Size[0];
+    width = d_Size[1];
+
+    myRow = myIdx/width;
+    myCol = myIdx - myRow*width;
+
+    int r = radius[0];
+    int ri = (threadIdx.x - r) + myRow;
+    if (ri < 0 || ri > height - 1) return;
+
+    for(int rj = myCol - r; rj <= myCol + r; rj++)
+    {
+        if (rj < 0 || rj > width - 1) continue;
+
+        if(pow(rj - myCol,2) + pow(ri - myRow,2) <= pow(r, 2))
+        {
+            d_targetArray[ri*width + rj] = 1;
+        }
+
+    }
+
+    return;
+}
+
+
 __global__ void CheckR_D_3D(char *d_targetArray, int* radius, int *d_Size, long int *d_InterfaceArray)
 {
     long int myIdx = d_InterfaceArray[blockIdx.x];
@@ -291,7 +353,7 @@ long int FindInterface_2D(  char*           mainArray,
 
     // main loop
 
-    #pragma omp parallel for schedule(auto) private(row, col, slice, interfaceFlag, temp_index)
+    #pragma omp parallel for schedule(auto) private(row, col, interfaceFlag, temp_index)
     for(long int i = 0; i<nElements; i++)
     {
         if(mainArray[i] != primaryPhase) continue;
@@ -584,7 +646,7 @@ int Hybrid_particleSD_2D(char*          P,
                          bool           debugFlag)
 {
     // read data structure
-    int height, width, depth;
+    int height, width;
     height = structureInfo->height;
     width = structureInfo->width;
     long int nElements = structureInfo->nElements;
@@ -674,16 +736,92 @@ int Hybrid_particleSD_2D(char*          P,
 
         // Do Dilation on GPU
 
-        
+        CheckR_D_2D<<<num_blocks, threads_per_block>>>(d_D, d_R, d_Size, d_InterfaceArray);
 
+        // Copy D into E
 
+        CHECK_CUDA( cudaMemcpy(D, d_D, sizeof(char)*nElements, cudaMemcpyDeviceToHost));
+        memcpy(E, D, sizeof(char)*nElements);
+        CHECK_CUDA( cudaMemcpy(d_E, d_D, sizeof(char)*nElements, cudaMemcpyDeviceToDevice));
+
+        // reset base variables for the new loop
+
+        interfaceCount = 0;
+        memset(InterfaceArray, 0, sizeof(long int)*nElements);
+        CHECK_CUDA( cudaMemset(d_InterfaceArray, 0, sizeof(long int)*nElements));
+
+        primaryPhase = 1;
+
+        // Find interfaces
+
+        interfaceCount = FindInterface_2D(D, InterfaceArray, structureInfo, primaryPhase, numThreads);
+
+        // GPU Operations
+
+        num_blocks = interfaceCount;
+
+        CHECK_CUDA( cudaMemcpy(d_InterfaceArray, InterfaceArray, sizeof(long int)*nElements, cudaMemcpyHostToDevice) );
+
+        // Perform Erosion
+
+        CheckR_E_2D<<<num_blocks, threads_per_block>>>(d_E, d_R, d_Size, d_InterfaceArray);
+
+        // Copy E back
+
+        CHECK_CUDA( cudaMemcpy(E, d_E, sizeof(char)*nElements, cudaMemcpyDeviceToHost));
+
+        // evaluate sums, print results to output file
+
+        e_sum = 0;
+        d_sum = 0;
+        p_sum = 0;
+        #pragma omp parallel for reduction(+:p_sum, d_sum, e_sum)
+        for(int i = 0; i<nElements; i++){
+            p_sum += P[i];
+            d_sum += D[i];
+            e_sum += E[i];
+            if(P[i] - E[i] == 1 && R[i] == -1) R[i] = radius;
+        }
+
+        // reset base variables for the new loop
+
+        interfaceCount = 0;
+        memset(InterfaceArray, 0, sizeof(long int)*nElements);
+        CHECK_CUDA( cudaMemset(d_InterfaceArray, 0, sizeof(long int)*nElements));
+
+        // Print to output file
+
+        if(debugFlag) printf("R = %d, P = %ld, E = %ld, D = %ld\n", radius, p_sum, e_sum, d_sum);
+        fprintf(OUT, "%d,%ld,%ld,%ld\n", radius, p_sum, e_sum, d_sum);
+
+        // Increment radius
+
+        radius++;
+        CHECK_CUDA( cudaMemcpy(d_R, &radius, sizeof(int), cudaMemcpyHostToDevice));
     }
 
 
+     /*---------------------------------------------------------------------
     
+                            Memory Management
 
+    ------------------------------------------------------------------------*/
+    // Files
 
+    fclose(OUT);
 
+    // Device
+
+    CHECK_CUDA( cudaFree(d_P));
+    CHECK_CUDA( cudaFree(d_E));
+    CHECK_CUDA( cudaFree(d_D));
+    CHECK_CUDA( cudaFree(d_InterfaceArray));
+    CHECK_CUDA( cudaFree(d_R));
+    CHECK_CUDA( cudaFree(d_Size));
+
+    // Host
+
+    free(size);
 
     return radius;
 }
@@ -956,13 +1094,11 @@ int ParticleSizeDist2D(bool debugMode)
 
     // Allocate Space for Erosion-Dilation
 
-    char *P = (char *)malloc(sizeof(char)*imgInfo.nElements);
     char *E = (char *)malloc(sizeof(char)*imgInfo.nElements);
     char *D = (char *)malloc(sizeof(char)*imgInfo.nElements);
 
     // Initialize ED arrays
 
-    memset(P, 0, sizeof(char) * imgInfo.nElements);
     memset(E, 0, sizeof(char) * imgInfo.nElements);
     memset(D, 0, sizeof(char) * imgInfo.nElements);
 
@@ -1003,8 +1139,8 @@ int ParticleSizeDist2D(bool debugMode)
 
     if (debugMode) printf("Starting Main Loop\n");
 
-    // radius = Hybrid_particleSD_3D(P, E, D, R, InterfaceArray, radius,
-    //                               numThreads, output_name, &structureInfo, debugMode);
+    radius = Hybrid_particleSD_2D(P, E, D, R, InterfaceArray, radius,
+                                  numThreads, output_name, &imgInfo, debugMode);
 
 
 

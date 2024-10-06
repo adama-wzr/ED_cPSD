@@ -279,6 +279,78 @@ int readImg_2D( char*           target_name,
     return 0;
 }
 
+
+int readStack   (char           *P,
+                sizeInfo*       structureInfo,
+                bool            debugMode)
+{
+    long int index;
+
+    char imgName[100];
+
+    sizeInfo2D tempSize;
+
+    unsigned char* target_img;
+
+    for(int sliceNum = 0; sliceNum < structureInfo->depth; sliceNum++)
+    {
+        // get image name
+        sprintf(imgName, "%05d.jpg", sliceNum);
+        
+        // read image
+
+        if(readImg_2D(imgName, &target_img, &tempSize) == 1)
+        {
+            // print error if wrong number of channels and debugMode is on
+            if (debugMode) printf("Wrong number of channels on image %d\n", sliceNum);
+            return 1;
+        }
+
+        // Check that the image is the appropriate size
+        // return error statements if the debugFlag is on.
+        
+        if (structureInfo->width != tempSize.width)
+        {
+            if(debugMode)
+            {
+                printf("Dimension mismatch on slice %d\n", sliceNum);
+                printf("Expected Width = %d\n", structureInfo->width);
+                printf("Actual Width   = %d\n", tempSize.width);
+            }
+            return 1;
+        } else if(structureInfo->height != tempSize.height)
+        {
+            if(debugMode)
+            {
+                printf("Dimension mismatch on slice %d\n", sliceNum);
+                printf("Expected Height = %d\n", structureInfo->height);
+                printf("Actual Height   = %d\n", tempSize.height);
+            }
+            return 1;
+        }
+
+        // use the information we just read to populate the 3d structure
+
+        for(int rowNum = 0; rowNum < tempSize.height; rowNum++)
+        {
+            for(int colNum = 0; colNum < tempSize.width; colNum++)
+            {
+                index = sliceNum*tempSize.width*tempSize.height +        \
+                        rowNum*tempSize.width + colNum;
+                // thresholding at 150
+                if (target_img[rowNum*tempSize.width + colNum] < 150) P[index] = 0;
+                else P[index] = 1;
+            }
+        }
+    }
+
+    // Free memory
+
+    free(target_img);
+    return 0;
+}
+
+
 int saveLabels2D(char*          P,
                  char*          R,
                  int*           L,
@@ -286,9 +358,8 @@ int saveLabels2D(char*          P,
                  char*          filename)
 {
     // read data structure
-    int height, width;
+    int width;
 
-    height = structureInfo->height;
     width = structureInfo->width;
     
     long int nElements = structureInfo->nElements;
@@ -640,6 +711,7 @@ void ParticleLabel2D(   int             rMin,
 
             }   // end inner while
             particleLabel++;        // push label increment
+            printf("Particle Label = %d, rad = %d\n", particleLabel, r);
         }   // end for
         r++;                        // increase radius label
     } // end while
@@ -1217,6 +1289,8 @@ int ParticleSizeDist2D(bool debugMode)
 
     if (readImg_2D( targetName, &target_img, &imgInfo) == 1) printf("Error, image has wrong number of channels\n");
 
+    if(readImg_2D( targetName, &target_img, &imgInfo) == 1) return 1;
+
     char* P = (char *)malloc(sizeof(char)*imgInfo.nElements);
 
     memset(P, 0, sizeof(char)*imgInfo.nElements);
@@ -1316,6 +1390,7 @@ int ParticleSizeDist2D(bool debugMode)
     return 0;
 }
 
+
 int PoreSizeDist2D(bool debugMode)
 {
     if (debugMode)
@@ -1377,7 +1452,7 @@ int ParticleSizeDist3D(bool debugMode)
     structureInfo.nElements = structureInfo.height  * structureInfo.width
                                                     * structureInfo.depth;
     // File names
-    sprintf(target_name, "rec_729_300_int1.csv");
+    
     sprintf(output_name, "Test_ED.csv");
 
     if (debugMode)
@@ -1417,8 +1492,22 @@ int ParticleSizeDist3D(bool debugMode)
 
     // Read and store input
 
-    if (inputMode == 0) readCSV(target_name, P, &structureInfo, debugMode);
-
+    if (inputMode == 0)
+    {
+        if (debugMode) printf("Reading .csv\n");
+        sprintf(target_name, "rec_729_300_int1.csv");
+        readCSV(target_name, P, &structureInfo, debugMode);
+    } else if(inputMode == 1)
+    {
+        if (debugMode) printf("Reading Stack\n");
+        if (readStack(P, &structureInfo, debugMode) == 1)
+        {
+            printf("Error encountered when reading stack. Consider using Debug Mode\n");
+            printf("Exiting now.\n");
+            return 1;
+        }
+    }
+    
     if (debugMode) printf("Structure Read\n");
 
     // Prepare variables for the main loop
@@ -1470,6 +1559,7 @@ int ParticleSizeDist3D(bool debugMode)
     free(L);
     return 0;
 }
+
 
 int PoreSizeDist3D(bool debugMode)
 {

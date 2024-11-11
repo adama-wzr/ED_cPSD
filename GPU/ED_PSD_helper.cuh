@@ -626,7 +626,6 @@ int f_EDT_2D(   int*        g,
     return f;
 }
 
-
 int Sep_EDT_2D( int*        g,
                 int         i,
                 int         u,
@@ -764,7 +763,157 @@ void Meijster2D(char*           targetArray,
     return;
 }
 
+void Meijster3D(char*           targetArray,
+                int*            targetEDT,
+                sizeInfo*       structureInfo,
+                int             primaryPhase)
+{
+    /*
+        The primary phase determines which phase will be used as the anchor to calculate the EDT.
+        In other words, a primary phase of 1 means the EDT will be calculated on phase 0, and the
+        distances are relative to phase 1.
+    */
+    int height, width, depth;
+    
+    height = structureInfo->height;
+    width = structureInfo->width;
+    depth = structureInfo->depth;
+    long int nElements = structureInfo->nElements;
+    long int index = 0;
 
+    int* g = (int *)malloc(sizeof(int)*nElements);
+
+    // First phase of the array: computation of g (column-wise operation)
+
+    // index = slice*(width*height) + row*(width) + col
+
+    for(int j = 0; j < width; j++)
+    {
+        for(int k = 0; k<depth; k++)
+        {
+            // scan 1 (top to bottom)
+            if (targetArray[k*(width*height) + j] == primaryPhase) g[k*(width*height) + j] = 0;
+            else g[k*(width*height) + j] = height+width+depth;
+
+            for (int i = 1; i<height; i++)
+            {
+                index = k*(width*height) + i*width + j;
+                if (targetArray[index] == primaryPhase) g[index] = 0;
+                else g[index] = 1 + g[index - width];
+            }
+
+            // scan 2 (bottom to top)
+            for(int i = height-2; i >= 0; i--)
+            {
+                index = k*(width*height) + i*width + j;
+                if (g[index + width] < g[index]) g[index] = 1 + g[index + width];
+            }
+        }
+    }
+
+    // second phase, computation of distance transforms explicitly
+
+    int* s = (int *)malloc(sizeof(int)*width*height);
+    int* t = (int *)malloc(sizeof(int)*width*height);
+
+    memset(s, 0, sizeof(int)*width*height);
+    memset(t, 0, sizeof(int)*width*height);
+
+    // begin scans
+
+    for(int k = 0; k<depth; k++)
+    {   // all slices
+        for(int i = 0; i<height; i++)
+        {   // all rows
+            // forward pass 3 (fixed row and slice)
+            int q = 0;
+            int w = 0;
+            s[0] = 0;
+            t[0] = 0;
+            for (int u = 1; u<width; u++)
+            {   // all columns
+                while(q >= 0 && 
+                            f_EDT_2D(g, k*width*depth + i*width + s[q], t[q], s[q]) > 
+                                    f_EDT_2D(g, k*width*depth + i*width + u, t[q], u)) q--;
+                if(q < 0)
+                {
+                    q = 0;
+                    s[0] = u;
+                } else
+                {
+                    w = 1 + Sep_EDT_2D(g, s[q], u, k*width*height + i*width + s[q], k*width*height + i*width + u);
+                    if (w < width)
+                    {
+                        q = q + 1;
+                        s[q] = u;
+                        t[q] = w;
+                    }
+                }
+            }
+
+            // backward scan
+            for(int u = width - 1; u >= 0; u--)
+            {
+                targetEDT[k*width*height + i*width + u] = f_EDT_2D(g, k*width*height + i*width + s[q], u, s[q]);
+                if(u == t[q]) q--;
+            }
+        }
+    }
+
+    // reset s and t
+
+    memset(s, 0, sizeof(int)*width*height);
+    memset(t, 0, sizeof(int)*width*height);
+
+    // now for all slices
+
+    for(int j = 0; j<width; j++)
+    {
+        for(int i = 0; i<height; i++)
+        {
+            // forward pass 3
+            int q = 0;
+            int w = 0;
+            s[0] = 0;
+            t[0] = 0;
+
+            for(int u = 1; u<depth; u++){
+                while(q >= 0 && 
+                            f_EDT_2D(g, s[q]*width*depth + i*width + j, t[q], s[q]) > 
+                                    f_EDT_2D(g, u*width*depth + i*width + j, t[q], u)) q--;
+
+                if(q < 0)
+                {
+                    q = 0;
+                    s[0] = u;
+                } else
+                {
+                    w = 1 + Sep_EDT_2D(g, s[q], u, s[q]*width*height + i*width + j, u*width*height + i*width + j);
+                    if (w < depth)
+                    {
+                        q = q + 1;
+                        s[q] = u;
+                        t[q] = w;
+                    }
+                }
+            }
+            // backward scan
+            for(int u = depth - 1; u >= 0; u--)
+            {
+                targetEDT[u*width*height + i*width + j] = f_EDT_2D(g, s[q]*width*height + i*width + j, u, s[q]);
+                if(u == t[q]) q--;
+            }
+        }
+    }
+
+    // memory management
+
+    free(s);
+    free(t);
+    free(g);
+
+    return;
+}
 
 void ParticleLabel2D(   int             rMin,
                         int             rMax,
@@ -1487,6 +1636,119 @@ int Hybrid_particleSD_3D(char*      P,
     return radius;
 }
 
+
+int particleSD_3D_Meijster( char*      P,
+                            char*      E, 
+                            char*      D,
+                            char*      R, 
+                            long int*  InterfaceArray, 
+                            int        radius, 
+                            int        numThreads, 
+                            char*      output_name,
+                            sizeInfo*  structureInfo,
+                            bool       debugFlag)
+{
+    // read data structure
+    int height, width, depth;
+    height = structureInfo->height;
+    width = structureInfo->width;
+    depth = structureInfo->depth;
+    long int nElements = structureInfo->nElements;
+
+    long int p_sum, d_sum, e_sum;
+    p_sum = 1;
+    e_sum = 1;
+    d_sum = 1;
+    int primaryPhase = 0;
+
+    int* EDT_Pore = (int *)malloc(sizeof(int)*nElements);
+    int* EDT_Particle = (int *)malloc(sizeof(int)*nElements);
+
+    memset(EDT_Pore, 0, sizeof(int)*nElements);
+    memset(EDT_Particle, 0, sizeof(int)*nElements);
+
+    /*-------------------------------------------------------
+    
+                        Main Loop
+    
+    -------------------------------------------------------*/
+    // EDT for particle only needs to be done once, since we copy P into E at the first step each time
+
+    Meijster3D(P, EDT_Particle, structureInfo, 0);
+
+    // Open output file
+
+    FILE *OUT;
+
+    OUT = fopen(output_name, "w+");
+    fprintf(OUT, "R,P,E,D\n");
+
+    long int interfaceCount = 0;
+
+    while (e_sum != 0 && radius < MAX_R )
+    {
+        memcpy(D,P,sizeof(char)*nElements);     // probably not necessary
+
+        for(int i = 0; i<nElements; i++){
+            if(EDT_Particle[i] <= radius*radius) D[i] = 0;
+        }
+
+        // copy D into E
+
+        memcpy(E, D, sizeof(char)*nElements);
+
+        // Meijster algorithm in D for pore-space EDT
+        
+        // memset(EDT_Pore, 0, sizeof(int)*nElements);
+
+        Meijster3D(D, EDT_Pore, structureInfo, 1);
+
+        // Update E
+        for(int i = 0; i<nElements; i++){
+            if(EDT_Pore[i] <= radius*radius) E[i] = 1;
+        }
+
+        // evaluate sums 
+
+        e_sum = 0;
+        d_sum = 0;
+        p_sum = 0;
+        #pragma omp parallel for reduction(+:p_sum, d_sum, e_sum)
+        for(int i = 0; i<nElements; i++){
+            p_sum += P[i];
+            d_sum += D[i];
+            e_sum += E[i];
+            if(P[i] - E[i] == 1 && R[i] == -1) R[i] = radius;
+        }
+        
+        // print to output file
+
+        if(debugFlag) printf("R = %d, P = %ld, E = %ld, D = %ld\n", radius, p_sum, e_sum, d_sum);
+        fprintf(OUT, "%d,%ld,%ld,%ld\n", radius, p_sum, e_sum, d_sum);
+
+        radius++;
+    } // end while
+
+    /*---------------------------------------------------------------------
+    
+                            Memory Management
+
+    ------------------------------------------------------------------------*/
+    // Files
+
+    fclose(OUT);
+
+    // Device
+
+    // Host
+
+    free(EDT_Pore);
+    free(EDT_Particle);
+
+    return radius;
+}
+
+
 /*--------------------------------------------------------
     
                     Parent Functions
@@ -1806,9 +2068,11 @@ int ParticleSizeDist3D(bool debugMode)
 
     if (debugMode) printf("Starting Main Loop\n");
 
-    radius = Hybrid_particleSD_3D(P, E, D, R, InterfaceArray, radius,
-                                  numThreads, output_name, &structureInfo, debugMode);
-
+    // radius = Hybrid_particleSD_3D(P, E, D, R, InterfaceArray, radius,
+    //                               numThreads, output_name, &structureInfo, debugMode);
+    radius = particleSD_3D_Meijster(P, E, D, R, InterfaceArray, radius,
+                                    numThreads, output_name, &structureInfo, debugMode);
+    
     /*---------------------------------------------------------------------
     
                             Save Labels

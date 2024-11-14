@@ -626,16 +626,34 @@ int f_EDT_2D(   int*        g,
     return f;
 }
 
+int f_EDT_3D(   int*        EDT2D,
+                int         EDT2D_index,
+                int         x,
+                int         i)
+{
+    int f = (x - i)*(x - i) + EDT2D[EDT2D_index];
+    return f;
+}
+
 int Sep_EDT_2D( int*        g,
                 int         i,
                 int         u,
                 int         g_index_i,
                 int         g_index_u)
 {
-    int Sep = (u*u - i*i + g[g_index_u]*g[g_index_u] - g[g_index_i]*g[g_index_i])/(2*(u-i));
+    int Sep = trunc(u*u - i*i + g[g_index_u]*g[g_index_u] - g[g_index_i]*g[g_index_i])/(2*(u-i));
     return Sep;
 }
 
+int Sep_EDT_3D( int*        EDT2D,
+                int         i,
+                int         u,
+                int         EDT2D_index_i,
+                int         EDT2D_index_u)
+{
+    int Sep = trunc(u*u - i*i + EDT2D[EDT2D_index_u] - EDT2D[EDT2D_index_i])/(2*(u-i));
+    return Sep;
+}
 
 void Meijster2D(char*           targetArray,
                 int*            targetEDT,
@@ -793,7 +811,7 @@ void Meijster3D(char*           targetArray,
         {
             // scan 1 (top to bottom)
             if (targetArray[k*(width*height) + j] == primaryPhase) g[k*(width*height) + j] = 0;
-            else g[k*(width*height) + j] = height+width+depth;
+            else g[k*(width*height) + j] = height+width;
 
             for (int i = 1; i<height; i++)
             {
@@ -839,12 +857,13 @@ void Meijster3D(char*           targetArray,
                 {
                     q = 0;
                     s[0] = u;
+                    t[0] = 0;
                 } else
                 {
                     w = 1 + Sep_EDT_2D(g, s[q], u, k*width*height + i*width + s[q], k*width*height + i*width + u);
                     if (w < width)
                     {
-                        q = q + 1;
+                        q++;
                         s[q] = u;
                         t[q] = w;
                     }
@@ -879,19 +898,20 @@ void Meijster3D(char*           targetArray,
 
             for(int u = 1; u<depth; u++){
                 while(q >= 0 && 
-                            f_EDT_2D(g, s[q]*width*depth + i*width + j, t[q], s[q]) > 
-                                    f_EDT_2D(g, u*width*depth + i*width + j, t[q], u)) q--;
+                            f_EDT_3D(targetEDT, s[q]*width*depth + i*width + j, t[q], s[q]) > 
+                                    f_EDT_3D(targetEDT, u*width*depth + i*width + j, t[q], u)) q--;
 
                 if(q < 0)
                 {
                     q = 0;
                     s[0] = u;
+                    t[0] = 0;
                 } else
                 {
-                    w = 1 + Sep_EDT_2D(g, s[q], u, s[q]*width*height + i*width + j, u*width*height + i*width + j);
+                    w = 1 + Sep_EDT_3D(targetEDT, s[q], u, s[q]*width*height + i*width + j, u*width*height + i*width + j);
                     if (w < depth)
                     {
-                        q = q + 1;
+                        q++;
                         s[q] = u;
                         t[q] = w;
                     }
@@ -900,7 +920,7 @@ void Meijster3D(char*           targetArray,
             // backward scan
             for(int u = depth - 1; u >= 0; u--)
             {
-                targetEDT[u*width*height + i*width + j] = f_EDT_2D(g, s[q]*width*height + i*width + j, u, s[q]);
+                targetEDT[u*width*height + i*width + j] = f_EDT_3D(targetEDT, s[q]*width*height + i*width + j, u, s[q]);
                 if(u == t[q]) q--;
             }
         }
@@ -2035,7 +2055,7 @@ int ParticleSizeDist3D(bool debugMode)
     if (inputMode == 0)
     {
         if (debugMode) printf("Reading .csv\n");
-        sprintf(target_name, "rec_729_300_int1.csv");
+        sprintf(target_name, "rec_837_300_int1.csv");
         readCSV(target_name, P, &structureInfo, debugMode);
     } else if(inputMode == 1)
     {

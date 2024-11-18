@@ -520,12 +520,8 @@ int pass12_2D(char* target_arr, int* g, int height, int width, int offset, int p
     }
 }
 
-int pass34_2D(int* g, int* local_DT, int* targetEDT, int width, int offset, int* s, int* t)
+int pass34_2D(int* g, int* targetEDT, int width, int offset, int* s, int* t)
 {
-    // initialize localDT
-
-    // memset(local_DT, 0, sizeof(int)*width);
-
     // initialize local s and t
     int q = 0;
     int w = 0;
@@ -561,6 +557,107 @@ int pass34_2D(int* g, int* local_DT, int* targetEDT, int width, int offset, int*
     return 0;
 }
 
+
+int pass12_3D(char* targetArray, int* g, int j, int k, int primaryPhase, int width, int height)
+{
+    // scan 1 (top to bottom)
+    if (targetArray[k*(width*height) + j] == primaryPhase) g[k*(width*height) + j] = 0;
+    else g[k*(width*height) + j] = height+width;
+
+    for (int i = 1; i<height; i++)
+    {
+        int index = k*(width*height) + i*width + j;
+        if (targetArray[index] == primaryPhase) g[index] = 0;
+        else g[index] = 1 + g[index - width];
+    }
+
+    // scan 2 (bottom to top)
+    for(int i = height-2; i >= 0; i--)
+    {
+        int index = k*(width*height) + i*width + j;
+        if (g[index + width] < g[index]) g[index] = 1 + g[index + width];
+    }
+}
+
+
+int pass34_3D(int* g, int* targetEDT, int* s, int* t, int k, int i, int width, int height)
+{
+    // forward pass 3 (fixed row and slice)
+    int q = 0;
+    int w = 0;
+    s[0] = 0;
+    t[0] = 0;
+    for (int u = 1; u<width; u++)
+    {   // all columns
+        while(q >= 0 && 
+                    f_EDT_2D(g, k*width*height + i*width + s[q], t[q], s[q]) > 
+                            f_EDT_2D(g, k*width*height + i*width + u, t[q], u)) q--;
+        if(q < 0)
+        {
+            q = 0;
+            s[0] = u;
+            t[0] = 0;
+        } else
+        {
+            w = 1 + Sep_EDT_2D(g, s[q], u, k*width*height + i*width + s[q], k*width*height + i*width + u);
+            if (w < width)
+            {
+                q++;
+                s[q] = u;
+                t[q] = w;
+            }
+        }
+    }
+
+    // backward scan
+    for(int u = width - 1; u >= 0; u--)
+    {
+        targetEDT[k*width*height + i*width + u] = f_EDT_2D(g, k*width*height + i*width + s[q], u, s[q]);
+        if(u == t[q]) q--;
+    }
+    return 0;
+}
+
+
+int pass56_3D(int* targetEDT, int* s, int* t, int j, int i, int width, int height, int depth)
+{
+    // forward pass 3
+    int q = 0;
+    int w = 0;
+    s[0] = 0;
+    t[0] = 0;
+
+    for(int u = 1; u<depth; u++){
+        while(q >= 0 && 
+                    f_EDT_3D(targetEDT, s[q]*width*depth + i*width + j, t[q], s[q]) > 
+                            f_EDT_3D(targetEDT, u*width*depth + i*width + j, t[q], u)) q--;
+
+        if(q < 0)
+        {
+            q = 0;
+            s[0] = u;
+            t[0] = 0;
+        } else
+        {
+            w = 1 + Sep_EDT_3D(targetEDT, s[q], u, s[q]*width*height + i*width + j, u*width*height + i*width + j);
+            if (w < depth)
+            {
+                q++;
+                s[q] = u;
+                t[q] = w;
+            }
+        }
+    }
+    // backward scan
+    for(int u = depth - 1; u >= 0; u--)
+    {
+        targetEDT[u*width*height + i*width + j] = f_EDT_3D(targetEDT, s[q]*width*height + i*width + j, u, s[q]);
+        if(u == t[q]) q--;
+    }
+    return 0;
+}
+
+
 void pMeijster2D(char*           targetArray,
                 int*            targetEDT,
                 sizeInfo2D*     structureInfo,
@@ -582,7 +679,6 @@ void pMeijster2D(char*           targetArray,
     #pragma omp parallel
     {
         // local DT, s, and t for each column scan (fixed row)
-        int* local_DT = (int *)malloc(sizeof(int)*width);
         int* s = (int *)malloc(sizeof(int)*width);
         int* t = (int *)malloc(sizeof(int)*width);
         memset(s, 0, sizeof(int)*width);
@@ -599,82 +695,17 @@ void pMeijster2D(char*           targetArray,
         for(int row = 0; row<height; row++)
         {
             int offset = row;
-            pass34_2D(g, local_DT, targetEDT, width, offset, s, t);
+            pass34_2D(g, targetEDT, width, offset, s, t);
         }
         free(s);
         free(t);
-        free(local_DT);
     }
 
     free(g);
 
-    // First phase of the array: computation of g
-
-    // for(int j = 0; j < width; j++)
-    // {
-    //     // scan 1
-    //     if (targetArray[j] == primaryPhase) g[j] = 0;
-    //     else g[j] = height+width;
-
-    //     for (int i = 1; i < height; i++)
-    //     {
-    //         if (targetArray[i*width + j] == primaryPhase) g[i*width + j] = 0;
-    //         else g[i*width + j] = 1 + g[(i - 1)*width + j];
-    //     }
-    //     // scan 2
-    //     for(int i = height - 2; i >= 0; i--)
-    //     {
-    //         if (g[(i+1)*width + j] < g[i*width + j]) g[i*width + j] = 1 + g[(i+1)*width + j];
-    //     }
-    // }
-
-    // // Second Phase
-
-    // int* s = (int *)malloc(sizeof(int)*width);
-    // int* t = (int *)malloc(sizeof(int)*width);
-
-    // memset(s, 0, sizeof(int)*width);
-    // memset(t, 0, sizeof(int)*width);
-
-    // for(int row = 0; row < height; row++)
-    // {
-    //     int q = 0;
-    //     int w = 0;
-    //     s[0] = 0;
-    //     t[0] = 0;
-    //     // scan 3
-    //     for(int u = 1; u<width; u++)
-    //     {
-    //         while (q >= 0 && f_EDT_2D(g, row*width + s[q], t[q], s[q]) > f_EDT_2D(g, row*width + u, t[q], u)) q = q - 1;
-
-    //         if (q < 0){
-    //             q = 0;
-    //             s[0] = u;
-    //         }else
-    //         {
-    //             w = 1 + Sep_EDT_2D(g, s[q], u, row*width + s[q], row*width + u);
-    //             if (w < width)
-    //             {
-    //                 q = q + 1;
-    //                 s[q] = u;
-    //                 t[q] = w;
-    //             }
-    //         }
-    //     }
-    //     // scan 4
-    //     for(int u = width - 1; u >= 0; u--)
-    //     {
-    //         targetEDT[row*width + u] = f_EDT_2D(g, row*width + s[q], u, s[q]);
-    //         if(u == t[q]) q = q - 1;
-    //     }
-    // }
-
-    // free(g);
-    // free(s);
-    // free(t);
-
     return;
 }
+
 
 void Meijster2D(char*           targetArray,
                 int*            targetEDT,
@@ -759,6 +790,73 @@ void Meijster2D(char*           targetArray,
     free(s);
     free(t);
 
+    return;
+}
+
+void pMeijster3D(char*           targetArray,
+                int*            targetEDT,
+                sizeInfo*       structureInfo,
+                int             primaryPhase)
+{
+    /*
+        The primary phase determines which phase will be used as the anchor to calculate the EDT.
+        In other words, a primary phase of 1 means the EDT will be calculated on phase 0, and the
+        distances are relative to phase 1.
+    */
+    int height, width, depth;
+    
+    height = structureInfo->height;
+    width = structureInfo->width;
+    depth = structureInfo->depth;
+    long int nElements = structureInfo->nElements;
+    long int index = 0;
+
+    int* g = (int *)malloc(sizeof(int)*nElements);
+
+    #pragma omp parallel
+    {
+        // initialize s and t locally
+        int* s = (int *)malloc(sizeof(int)*width*height);
+        int* t = (int *)malloc(sizeof(int)*width*height);
+        memset(s, 0, sizeof(int)*width*height);
+        memset(t, 0, sizeof(int)*width*height);
+
+        // phase 1
+
+        
+        for(int j = 0; j<width; j++)
+        {
+            #pragma omp for schedule(auto)
+            for(int k = 0; k<depth; k++)
+            {
+                pass12_3D(targetArray, g, j, k, primaryPhase, width, height);
+            }
+        }
+
+        // phase 2
+
+        for(int k = 0; k<depth; k++)
+        {   // all slices
+            #pragma omp for schedule(auto)
+            for(int i = 0; i<height; i++)
+            {   // all rows
+                pass34_3D(g, targetEDT, s, t, k, i, width, height);
+            }
+        }
+
+        for(int j = 0; j<width; j++)
+        {
+            #pragma omp for schedule(auto)
+            for(int i = 0; i<height; i++)
+            {
+                pass56_3D(targetEDT, s, t, j, i, width, height, depth);
+            }
+        }
+        free(s);
+        free(t);
+    }
+
+    free(g);
     return;
 }
 
@@ -1280,6 +1378,8 @@ int particleSD_3D_Meijster( char*      P,
     d_sum = 1;
     int primaryPhase = 0;
 
+    omp_set_num_threads(numThreads);
+
     int* EDT_Pore = (int *)malloc(sizeof(int)*nElements);
     int* EDT_Particle = (int *)malloc(sizeof(int)*nElements);
 
@@ -1293,7 +1393,7 @@ int particleSD_3D_Meijster( char*      P,
     -------------------------------------------------------*/
     // EDT for particle only needs to be done once, since we copy P into E at the first step each time
 
-    Meijster3D(P, EDT_Particle, structureInfo, 0);
+    pMeijster3D(P, EDT_Particle, structureInfo, 0);
 
     // Open output file
 
@@ -1320,7 +1420,7 @@ int particleSD_3D_Meijster( char*      P,
         
         // memset(EDT_Pore, 0, sizeof(int)*nElements);
 
-        Meijster3D(D, EDT_Pore, structureInfo, 1);
+        pMeijster3D(D, EDT_Pore, structureInfo, 1);
 
         // Update E
         for(int i = 0; i<nElements; i++){

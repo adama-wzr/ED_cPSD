@@ -17,7 +17,7 @@ int main(void){
     bool input2D;
     bool debugMode, particleFlag, poreFlag;
 
-    input2D = true;
+    input2D = false;
     debugMode = true;
     particleFlag = true;
     poreFlag = false;

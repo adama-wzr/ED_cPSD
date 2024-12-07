@@ -502,6 +502,71 @@ int Sep_EDT_3D( int*        EDT2D,
     return Sep;
 }
 
+int pass12_Global(char* target_arr, double* EDT, int j, int k, int width, int height, int depth, int primaryPhase){
+    int stride = width;
+    int offset = k*(width*height) + j;
+
+    if(target_arr[offset] == primaryPhase) EDT[offset] = 0;
+    else EDT[offset] = height + width + depth;
+
+    // scan 1: forward
+    for(int i = 1; i<height; i++)
+    {
+        if(target_arr[offset+i*stride] == primaryPhase) EDT[offset+i*stride] = 0;
+        else EDT[offset+i*stride] = 1 + EDT[offset + (i-1)*stride];
+    }
+    // scan 2: backward
+    for(int i = height - 2; i >= 0; i--)
+    {
+        if(EDT[offset + (i + 1)*stride] < EDT[offset + i*stride]) EDT[offset + i*stride] = 1 + EDT[offset + (i + 1)*stride];
+    }
+    return 0;
+}
+
+int pass34_Global(double* EDT, double* EDT_temp, int scanLength, int stride, int* s, int* t)
+{
+    for(int i = 0; i<scanLength; i++) EDT_temp[i] = EDT[i*stride];
+
+    int q = 0;
+    double w = 0;
+    s[0] = 0;
+    t[0] = 0;
+
+    // forward scan
+
+    for(int u = 1; u<scanLength; u++)
+    {
+        while(q >= 0 && (   (pow((t[q] - s[q]),2) + pow(EDT_temp[s[q]], 2)) >= 
+                            (pow((t[q] - u),2) + pow(EDT_temp[u], 2)) )) q--;
+        
+        if(q < 0){
+            q = 0;
+            s[0] = u;
+            t[0] = 0;
+        } else
+        {
+            w = 1 + trunc(
+                (pow(u,2) - pow(s[q],2) + pow(EDT_temp[u],2) - pow(EDT_temp[s[q]],2))
+                /(2*(double)(u - s[q]))  );
+            if(w < scanLength)
+            {
+                q++;
+                s[q] = u;
+                t[q] = (int) w;
+            }
+        }
+    }
+
+    // backward update
+    for(int u = scanLength - 1; u >=0; u--)
+    {
+        EDT[u*stride] = sqrt(pow(u-s[q],2) + pow(EDT_temp[s[q]],2));
+        if(u == t[q]) q--;
+    }
+
+    return 0;
+}
+
 int pass12_2D(char* target_arr, int* g, int height, int width, int offset, int primaryPhase)
 {
     // scan 1
@@ -842,6 +907,81 @@ void Meijster2D(char*           targetArray,
     return;
 }
 
+void pMeijster3D_debug( char*           targetArray,
+                        double*         targetEDT,
+                        sizeInfo*       structureInfo,
+                        int             primaryPhase)
+{
+    /*
+        The primary phase determines which phase will be used as the anchor to calculate the EDT.
+        In other words, a primary phase of 1 means the EDT will be calculated on phase 0, and the
+        distances are relative to phase 1.
+    */
+    int height, width, depth;
+    
+    height = structureInfo->height;
+    width = structureInfo->width;
+    depth = structureInfo->depth;
+    long int nElements = structureInfo->nElements;
+    long int index = 0;
+
+    #pragma omp parallel
+    {
+        // initialize s and t locally
+        int* s = (int *)malloc(sizeof(int)*width*height);
+        int* t = (int *)malloc(sizeof(int)*width*height);
+        memset(s, 0, sizeof(int)*width*height);
+        memset(t, 0, sizeof(int)*width*height);
+
+        int LL = (height>width) ? height : width;
+        LL = (depth > LL) ? depth : LL;
+
+        double* tempEDT = (double *)malloc(sizeof(double)*LL);
+
+        // phase 1
+
+        for(int j = 0; j<width; j++)
+        {
+            #pragma omp for schedule(auto)
+            for(int k = 0; k<depth; k++)
+            {
+                pass12_Global(targetArray, targetEDT, j, k, width, height, depth, primaryPhase);
+            }
+        }
+
+        // phase 2
+
+        for(int k = 0; k<depth; k++)
+        {   // all slices
+            #pragma omp for schedule(auto)
+            for(int i = 0; i<height; i++)
+            {   // all rows
+                size_t offset = k*width*height + i*width;
+                pass34_Global(targetEDT + offset, tempEDT, width, 1, s, t);
+            }
+        }
+
+        // maybe not necessary, but clean arrays anyways
+        memset(s, 0, sizeof(int)*width*height);
+        memset(t, 0, sizeof(int)*width*height);
+
+        for(int j = 0; j<width; j++)
+        {
+            #pragma omp for schedule(auto)
+            for(int i = 0; i<height; i++)
+            {
+                // pass56_3D(targetEDT, s, t, j, i, width, height, depth);
+                size_t offset = i*width + j;
+                pass34_Global(targetEDT + offset, tempEDT, depth, height*width, s, t);
+            }
+        }
+        free(s);
+        free(t);
+    }
+
+    return;
+}
+
 void pMeijster3D(char*           targetArray,
                 int*            targetEDT,
                 sizeInfo*       structureInfo,
@@ -869,6 +1009,11 @@ void pMeijster3D(char*           targetArray,
         int* t = (int *)malloc(sizeof(int)*width*height);
         memset(s, 0, sizeof(int)*width*height);
         memset(t, 0, sizeof(int)*width*height);
+
+        int LL = (height>width) ? height : width;
+        LL = (depth > LL) ? depth : LL;
+
+        double* tempEDT = (double *)malloc(sizeof(double)*LL);
 
         // phase 1
 
@@ -1434,11 +1579,16 @@ int particleSD_3D_Meijster( char*      P,
 
     omp_set_num_threads(numThreads);
 
-    int* EDT_Pore = (int *)malloc(sizeof(int)*nElements);
-    int* EDT_Particle = (int *)malloc(sizeof(int)*nElements);
+    // int* EDT_Pore = (int *)malloc(sizeof(int)*nElements);
+    // int* EDT_Particle = (int *)malloc(sizeof(int)*nElements);
 
-    memset(EDT_Pore, 0, sizeof(int)*nElements);
-    memset(EDT_Particle, 0, sizeof(int)*nElements);
+    // memset(EDT_Pore, 0, sizeof(int)*nElements);
+    // memset(EDT_Particle, 0, sizeof(int)*nElements);
+    double* EDT_Pore = (double *)malloc(sizeof(double)*nElements);
+    double* EDT_Particle = (double *)malloc(sizeof(double)*nElements);
+
+    memset(EDT_Pore, 0, sizeof(double)*nElements);
+    memset(EDT_Particle, 0, sizeof(double)*nElements);
 
     /*-------------------------------------------------------
     
@@ -1447,7 +1597,8 @@ int particleSD_3D_Meijster( char*      P,
     -------------------------------------------------------*/
     // EDT for particle only needs to be done once, since we copy P into E at the first step each time
 
-    pMeijster3D(P, EDT_Particle, structureInfo, 0);
+    // pMeijster3D(P, EDT_Particle, structureInfo, 0);
+    pMeijster3D_debug(P, EDT_Particle, structureInfo, 0);
 
     // FILE *EDT;
 
@@ -1476,7 +1627,7 @@ int particleSD_3D_Meijster( char*      P,
         memcpy(D,P,sizeof(char)*nElements);     // probably not necessary
 
         for(int i = 0; i<nElements; i++){
-            if(EDT_Particle[i] <= radius*radius) D[i] = 0;
+            if((int) pow(EDT_Particle[i],2) <= radius*radius) D[i] = 0;
         }
 
         // copy D into E
@@ -1487,11 +1638,11 @@ int particleSD_3D_Meijster( char*      P,
         
         memset(EDT_Pore, 0, sizeof(int)*nElements);
 
-        pMeijster3D(D, EDT_Pore, structureInfo, 1);
+        pMeijster3D_debug(D, EDT_Pore, structureInfo, 1);
 
         // Update E
         for(int i = 0; i<nElements; i++){
-            if(EDT_Pore[i] <= radius*radius) E[i] = 1;
+            if((int) pow(EDT_Pore[i],2) <= radius*radius) E[i] = 1;
         }
 
         // evaluate sums 
@@ -1745,15 +1896,15 @@ int ParticleSizeDist3D(bool debugMode)
 
     // Output Options
 
-    int numThreads = 1;                         // Number of CPU threads to be used
+    int numThreads = 8;                         // Number of CPU threads to be used
 
     // Structure dimension
 
     sizeInfo structureInfo;
 
-    structureInfo.height = 1;
-    structureInfo.width = 128;
-    structureInfo.depth = 128;
+    structureInfo.height = 300;
+    structureInfo.width = 300;
+    structureInfo.depth = 300;
     structureInfo.nElements = structureInfo.height  * structureInfo.width
                                                     * structureInfo.depth;
     // File names
@@ -1800,7 +1951,7 @@ int ParticleSizeDist3D(bool debugMode)
     if (inputMode == 0)
     {
         if (debugMode) printf("Reading .csv\n");
-        sprintf(target_name, "00_3D_xz.csv");
+        sprintf(target_name, "rec_837_300_int1.csv");
         readCSV(target_name, P, &structureInfo, debugMode);
     } else if(inputMode == 1)
     {

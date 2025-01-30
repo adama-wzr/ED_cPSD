@@ -48,6 +48,7 @@ typedef struct
     char inputType;
     bool batchFlag;
     unsigned char TH;
+    int maxR;
 } options;
 
 typedef struct
@@ -120,6 +121,7 @@ void printOpts(options *opts)
     // nThreads
 
     printf("Num. threads: %d\n", opts->nThreads);
+    printf("Max. Scan Radius: %d\n", opts->maxR);
 
     printf("--------------------------------------\n\n");
 
@@ -161,6 +163,8 @@ int readInput(char *inputFilename, options *opts)
     opts->poreSD = false;
 
     opts->TH = 128;
+
+    opts->maxR = 100;
 
     /*
     --------------------------------------------------------------------------------
@@ -771,7 +775,7 @@ int pass34_Global(double* EDT, double* EDT_temp, int scanLength, int stride, int
     return 0;
 }
 
-int pass12_2D(char* target_arr, int* g, int height, int width, int offset, int primaryPhase)
+int pass12_2D(bool* target_arr, int* g, int height, int width, int offset, int primaryPhase)
 {
     // scan 1
     if (target_arr[offset] == primaryPhase) g[offset] = 0;
@@ -976,7 +980,7 @@ int pass56_debug(int* EDT, int* s, int* t, int depth, int stride){
     return 0;
 }
 
-void pMeijster2D(char*           targetArray,
+void pMeijster2D(bool*           targetArray,
                 int*            targetEDT,
                 sizeInfo2D*     structureInfo,
                 int             primaryPhase)
@@ -1650,6 +1654,119 @@ void ParticleLabel3D(   int             rMin,
 
  --------------------------------------------------------*/
 
+int partSD_2D(options *opts,
+              sizeInfo2D *info,
+              char *P,
+              char POI)
+{
+    /*
+        Function partSD_2D:
+        Inputs:
+            - pointer to options struct
+            - pointer to structure info struct
+            - pointer to phase-array
+    */
+
+    // Loop variables
+
+    long int p_sum, d_sum, e_sum;
+    
+    e_sum = 1; // have to initialize, otherwise loop won't start
+
+    // arrays for holding the EDM:
+
+    int* EDT_D = (int *)malloc(sizeof(int) * info->nElements);
+    int* EDT_E = (int *)malloc(sizeof(int) * info->nElements);
+
+    memset(EDT_D, 0, sizeof(int) * info->nElements);
+    memset(EDT_E, 0, sizeof(int) * info->nElements);
+
+    // arrays for erosion and dilation
+
+    bool* E = (bool *)malloc(sizeof(bool) * info->nElements);
+    bool* D = (bool *)malloc(sizeof(bool) * info->nElements);
+    bool* B = (bool *)malloc(sizeof(bool) * info->nElements);
+
+    memset(E, 0, sizeof(bool) * info->nElements);
+    memset(D, 0, sizeof(bool) * info->nElements);
+    memset(B, 0, sizeof(bool) * info->nElements);
+
+    // If POI, bool = 1
+
+    for(int i = 0; i < info->nElements; i++)
+    {
+        if (P[i] == POI)
+                B[i] = 1;
+    }
+
+    // EDT for dilation is a one time operation
+
+    pMeijster2D(B, EDT_D, info, 0);     // 0 is the phase that will be dilated
+
+    int radius = 1;
+
+    while(e_sum != 0 && radius < opts->maxR)
+    {
+        // copy P into D (probably not necessary)
+
+        memcpy(D, P, sizeof(bool) * info->nElements);
+
+        for (int i = 0; i < info->nElements; i++)
+        {
+            if (EDT_D[i] <= radius * radius)
+                D[i] = 0;
+        }
+
+        // copy D into E
+
+        memcpy(E, D, sizeof(bool) * info->nElements);
+
+        // Meijster in D
+
+        pMeijster2D(D, EDT_E, info, 1);
+
+        // Update E
+
+        for (int i = 0; i < info->nElements; i++)
+        {
+            if (EDT_E[i] <= radius * radius)
+                E[i] = 1;
+        }
+
+        e_sum = 0;
+        d_sum = 0;
+        p_sum = 0;
+        #pragma omp parallel for reduction(+ : p_sum, d_sum, e_sum)
+        for (int i = 0; i < info->nElements; i++)
+        {
+            p_sum += P[i];
+            d_sum += D[i];
+            e_sum += E[i];
+            // if (P[i] - E[i] == 1 && R[i] == -1)
+            //     R[i] = radius;
+        }
+
+        // print to output file
+
+        if (opts->verbose)
+            printf("R = %d, P = %ld, E = %ld, D = %ld\n", radius, p_sum, e_sum, d_sum);
+
+        // increment radius
+        radius++;
+    }
+    
+    // memory management
+
+    free(EDT_D);
+    free(EDT_E);
+    
+    free(B);
+    free(E);
+    free(D);
+
+    return 0;
+}
+
 int particleSD_2D_Meijster( char*          P,
                             char*          E, 
                             char*          D,
@@ -1692,7 +1809,7 @@ int particleSD_2D_Meijster( char*          P,
 
     // EDT for particle only needs to be done once, since we copy P into E at the first step each time
 
-    pMeijster2D(P, EDT_Particle, structureInfo, 0);
+    // pMeijster2D(P, EDT_Particle, structureInfo, 0);
 
     while (e_sum != 0 && radius < MAX_R )
     {
@@ -1712,7 +1829,7 @@ int particleSD_2D_Meijster( char*          P,
 
         // Meijster algorithm in D for pore-space EDT
 
-        pMeijster2D(D, EDT_Pore, structureInfo, 1);
+        // pMeijster2D(D, EDT_Pore, structureInfo, 1);
 
         // Update D
         for(int row = 0; row<height; row++)
@@ -1895,6 +2012,72 @@ int particleSD_3D_Meijster( char*      P,
                     Parent Functions
 
  --------------------------------------------------------*/
+
+int Sim2D(options *opts)
+{
+    /*---------------------------------------------------------------------
+    
+                            Read Input
+                                &
+                          Declare Arrays 
+
+        Input mode flags:
+        - Flag = 0 means jpg image (using stb image).
+        - Flag = 1 means tiff file.             (NOT IMPLEMENTED)
+
+    ------------------------------------------------------------------------*/
+
+    // declare structure related variables
+
+    unsigned char* target_img;
+    sizeInfo2D imgInfo;
+
+    // set omp options
+
+    omp_set_num_threads(opts->nThreads);
+
+    // read structure
+
+    if(opts->inputType == 0)
+    {
+        if (readImg_2D( opts->inputFilename, &target_img, &imgInfo) == 1)
+                printf("Error, image has wrong number of channels\n");
+    } else
+    {
+        printf("Method not implemented yet!\n");
+    }
+    
+    // Create array to hold structure
+
+    char* P = (char *)malloc(sizeof(char)*imgInfo.nElements);
+
+    memset(P, 0, sizeof(char)*imgInfo.nElements);
+
+    // Cast image into P, free original array
+
+    for (int i = 0; i < imgInfo.nElements; i++)
+    {
+        if (target_img[i] < opts->TH)
+            P[i] = 0;
+        else
+            P[i] = 1;
+    }
+
+    free(target_img);
+
+    // Perform the selected simulations
+
+    if(opts->poreSD)
+        partSD_2D(opts, &imgInfo, P, 1);
+
+    
+    // Memory Management
+    free(P);
+
+    return 0;
+}
+
+
 
 int ParticleSizeDist2D(bool debugMode)
 {

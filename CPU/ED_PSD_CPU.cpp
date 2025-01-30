@@ -5,7 +5,7 @@
     This version is just a main file, will call functions from helper files.
 
     Last Update:
-    11/17/2024
+    01/30/2025
 
     Andre Adam.
 */
@@ -13,6 +13,23 @@
 #include "ED_PSD_CPU.hpp"
 
 int main(void){
+
+    // struct to hold user input
+
+    options opts;
+
+    // read user input
+
+    char input[100];
+    sprintf(input, "input.txt");
+
+    readInput(input, &opts);
+
+    if (opts.verbose)
+        printOpts(&opts);
+
+    return 0;
+
     // flags to determine which code to run
     bool input2D;
     bool debugMode, particleFlag, poreFlag;

@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <time.h>
 #include <string.h>
+#include <string>
+#include <fstream>
 #include <stdbool.h>
 #include <omp.h>
 #include <list>
@@ -13,18 +15,40 @@
 #include "stb_image.h"
 
 /*--------------------------------------------------------
-    
+
                      Constants
 
  --------------------------------------------------------*/
 
-#define MAX_R 65
+#define MAX_R 100
 
 /*--------------------------------------------------------
-    
+
                     Data structures
 
  --------------------------------------------------------*/
+
+typedef struct
+{
+    int nD;
+    char *inputFilename;
+    char *poreSD_Out;
+    char *partSD_Out;
+    char *poreLabel_Out;
+    char *partLabel_Out;
+    bool poreSD;
+    bool partSD;
+    bool poreLabel;
+    bool partLabel;
+    bool verbose;
+    int nThreads;
+    int height;
+    int width;
+    int depth;
+    char inputType;
+    bool batchFlag;
+    unsigned char TH;
+} options;
 
 typedef struct
 {
@@ -41,6 +65,189 @@ typedef struct
     long int nElements;
 } sizeInfo2D;
 
+/*
+
+    Functions for reading and printing user input:
+
+*/
+
+void printOpts(options *opts)
+{
+    /*
+        Function printOpts:
+        Inputs:
+            - pointer to opts struct
+        Output:
+            - None
+
+        Function will print user options to the command line.
+    */
+
+    printf("--------------------------------------\n\n");
+    printf("c-PSD Simulation\n");
+    printf("Current selected options:\n\n");
+    printf("--------------------------------------\n");
+    printf("Number of Dimensions: %d\n", opts->nD);
+    printf("InputType = %d\n", opts->inputType);
+
+    // separate dimensions
+    if (opts->nD == 2)
+    {
+        if (opts->inputType == 0)
+        {
+            printf("Input Name: %s\n", opts->inputFilename);
+            printf("Phase Threshold: %d\n", (int)opts->TH);
+        }
+        // options related to simulation type
+        if (opts->poreSD)
+        {
+            printf("Pore Size Distribution Output: %s\n", opts->poreSD_Out);
+        }
+        if (opts->poreLabel)
+        {
+            printf("Pore Label Output: %s\n", opts->poreLabel_Out);
+        }
+        if (opts->partSD)
+        {
+            printf("Partciel Size Distribution Output: %s\n", opts->partSD_Out);
+        }
+        if (opts->partLabel)
+        {
+            printf("Particle Label Output: %s\n", opts->partLabel_Out);
+        }
+    }
+
+    // nThreads
+
+    printf("Num. threads: %d\n", opts->nThreads);
+
+    printf("--------------------------------------\n\n");
+
+    return;
+}
+
+int readInput(char *inputFilename, options *opts)
+{
+    /*
+        Function readInput:
+        Inputs:
+            - pointer to array holding the input file name
+            - pointer to optins struct
+        Outputs:
+            - none
+
+        Function will read the user entered information from the input file and
+        populate the opts array with the relevant information.
+    */
+    // open file and start reading
+    std::string myText;
+
+    char tempC[1000];
+    double tempD;
+    char tempFilenames[1000];
+
+    std::ifstream InputFile(inputFilename);
+
+    // defaults
+
+    opts->nThreads = 1;
+    opts->verbose = true;
+    opts->batchFlag = false;
+    opts->inputType = 0;
+
+    opts->poreSD = false;
+    opts->partSD = false;
+    opts->partLabel = false;
+    opts->poreSD = false;
+
+    opts->TH = 128;
+
+    /*
+    --------------------------------------------------------------------------------
+
+    If anybody has a better idea of how to parse inputs please let me know.
+    Eventually I'm hoping the GUI will replace a lot of this code.
+
+    --------------------------------------------------------------------------------
+    */
+
+    while (std::getline(InputFile, myText))
+    {
+        sscanf(myText.c_str(), "%s %lf", tempC, &tempD);
+        if (strcmp(tempC, "nD:") == 0)
+        {
+            opts->nD = (int)tempD;
+        }
+        else if (strcmp(tempC, "inputFilename:") == 0)
+        {
+            sscanf(myText.c_str(), "%s %s", tempC, tempFilenames);
+            opts->inputFilename = (char *)malloc(1000 * sizeof(char));
+            strcpy(opts->inputFilename, tempFilenames);
+        }
+        else if (strcmp(tempC, "poreOut:") == 0)
+        {
+            opts->poreSD = true;
+            sscanf(myText.c_str(), "%s %s", tempC, tempFilenames);
+            opts->poreSD_Out = (char *)malloc(1000 * sizeof(char));
+            strcpy(opts->poreSD_Out, tempFilenames);
+        }
+        else if (strcmp(tempC, "partOut:") == 0)
+        {
+            opts->partSD = true;
+            sscanf(myText.c_str(), "%s %s", tempC, tempFilenames);
+            opts->partSD_Out = (char *)malloc(1000 * sizeof(char));
+            strcpy(opts->partSD_Out, tempFilenames);
+        }
+        else if (strcmp(tempC, "poreLabelOut:") == 0)
+        {
+            opts->poreLabel = true;
+            sscanf(myText.c_str(), "%s %s", tempC, tempFilenames);
+            opts->poreLabel_Out = (char *)malloc(1000 * sizeof(char));
+            strcpy(opts->poreLabel_Out, tempFilenames);
+        }
+        else if (strcmp(tempC, "partLabelOut:") == 0)
+        {
+            opts->partLabel = true;
+            sscanf(myText.c_str(), "%s %s", tempC, tempFilenames);
+            opts->partLabel_Out = (char *)malloc(1000 * sizeof(char));
+            strcpy(opts->partLabel_Out, tempFilenames);
+        }
+        else if (strcmp(tempC, "nThreads:") == 0)
+        {
+            opts->nThreads = (int)tempD;
+        }
+        else if (strcmp(tempC, "verbose:") == 0)
+        {
+            if ((int)tempD == 0)
+                opts->verbose = false;
+            else if ((int)tempD == 1)
+                opts->verbose = true;
+            else
+                printf("Invalid verbose, default to 'true'.\n");
+        }
+        else if (strcmp(tempC, "width:") == 0)
+        {
+            opts->width = (int)tempD;
+        }
+        else if (strcmp(tempC, "height:") == 0)
+        {
+            opts->height = (int)tempD;
+        }
+        else if (strcmp(tempC, "depth:") == 0)
+        {
+            opts->depth = (int)tempD;
+        }
+        else if (strcmp(tempC, "TH:") == 0)
+        {
+            opts->TH = (unsigned char)tempD;
+        }
+        else if (strcmp(tempC, "inputType:") == 0)
+        {
+            opts->inputType = (int)tempD;
+        }
+    }
+    return 0;
+}
 
 int readCSV(char*           target_name, 
             char*           P, 
@@ -456,10 +663,7 @@ long int FindInterface_3D(  char*           mainArray,
             InterfaceArray[interfaceCount] = i;
             interfaceCount++;
         }
-
     }
-
-
     return interfaceCount;
 }
 

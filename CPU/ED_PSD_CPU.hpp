@@ -49,6 +49,7 @@ typedef struct
     bool batchFlag;
     unsigned char TH;
     int maxR;
+    int radOff;
 } options;
 
 typedef struct
@@ -163,8 +164,8 @@ int readInput(char *inputFilename, options *opts)
     opts->poreSD = false;
 
     opts->TH = 128;
-
     opts->maxR = 100;
+    opts->radOff = 0;
 
     /*
     --------------------------------------------------------------------------------
@@ -409,8 +410,7 @@ int readStack   (char           *P,
 }
 
 
-int saveLabels2D(char*          P,
-                 char*          R,
+int saveLabels2D(int*           R,
                  int*           L,
                  sizeInfo2D*    structureInfo,
                  char*          filename)
@@ -424,11 +424,11 @@ int saveLabels2D(char*          P,
     
     // Open File
     
-    FILE *Particle;
+    FILE *OUT;
 
-    Particle = fopen(filename, "a+");
+    OUT = fopen(filename, "w+");
 
-    fprintf(Particle, "x,y,R,L\n");
+    fprintf(OUT, "x,y,R,L\n");
     
     int row,col;
     
@@ -440,13 +440,13 @@ int saveLabels2D(char*          P,
         {
             row = i/width;
             col = i - row*width;
-            fprintf(Particle,"%d,%d,%d,%d\n", col, row, (int) R[i], L[i]);
+            fprintf(OUT,"%d,%d,%d,%d\n", col, row, R[i], L[i]);
         } 
     }
 
     // close file
     
-    fclose(Particle);
+    fclose(OUT);
     
     return 0;
 }
@@ -1421,11 +1421,12 @@ void Meijster3D(char*           targetArray,
     return;
 }
 
-void ParticleLabel2D(   int             rMin,
-                        int             rMax,
-                        char*           R,
-                        int*            L,
-                        sizeInfo2D*     structureInfo)
+void ParticleLabel2D(int rMin,
+                     int rMax,
+                     int *R,
+                     int *L,
+                     sizeInfo2D *structureInfo,
+                     options *opts)
 {
 
     // open list
@@ -1449,18 +1450,19 @@ void ParticleLabel2D(   int             rMin,
 
     int r = rMin;
 
-    while (r <= rMax)       // main loop
+    while (r <= rMax) // main loop
     {
-        for(int i = 0; i<nElements; i++)
+        for (int i = 0; i < nElements; i++)
         {
-            if (R[i] != r || L[i] != -1) continue;
+            if (R[i] != r || L[i] != -1)
+                continue;
 
             // Label L[i] accordingly and add it to scan list
 
             L[i] = particleLabel;
 
             oList.push_back(i);
-            while(!oList.empty())       // Flood-Fill search starting from this label alone
+            while (!oList.empty()) // Flood-Fill search starting from this label alone
             {
                 // pop first index on the list and erase it
                 long int index = *oList.begin();
@@ -1468,61 +1470,59 @@ void ParticleLabel2D(   int             rMin,
 
                 // decode index
 
-                myRow = index/width;
-                myCol = index - myRow*width;
+                myRow = index / width;
+                myCol = index - myRow * width;
 
                 // Search Neighbords with the same r
 
-                if(myRow != 0)
+                if (myRow != 0)
                 {
                     temp_index = index - width;
-                    if(L[temp_index] == -1 && R[temp_index] == r)
+                    if (L[temp_index] == -1 && R[temp_index] == r)
                     {
                         oList.push_back(temp_index);
                         L[temp_index] = particleLabel;
                     }
                 }
 
-                if(myRow != height - 1)
+                if (myRow != height - 1)
                 {
                     temp_index = index + width;
-                    if(L[temp_index] == -1 && R[temp_index] == r)
+                    if (L[temp_index] == -1 && R[temp_index] == r)
                     {
                         oList.push_back(temp_index);
                         L[temp_index] = particleLabel;
                     }
                 }
 
-                if(myCol != 0)
+                if (myCol != 0)
                 {
                     temp_index = index - 1;
-                    if(L[temp_index] == -1 && R[temp_index] == r)
+                    if (L[temp_index] == -1 && R[temp_index] == r)
                     {
                         oList.push_back(temp_index);
                         L[temp_index] = particleLabel;
                     }
                 }
 
-                if(myCol != width - 1)
+                if (myCol != width - 1)
                 {
                     temp_index = index + 1;
-                    if(L[temp_index] == -1 && R[temp_index] == r)
+                    if (L[temp_index] == -1 && R[temp_index] == r)
                     {
                         oList.push_back(temp_index);
                         L[temp_index] = particleLabel;
                     }
                 }
 
-            }   // end inner while
-            particleLabel++;        // push label increment
-            printf("Particle Label = %d, rad = %d\n", particleLabel, r);
-        }   // end for
-        r++;                        // increase radius label
+            } // end inner while
+            particleLabel++; // push label increment
+        } // end for
+        r++; // increase radius label
     } // end while
 
     return;
 }
-
 
 void ParticleLabel3D(   int             rMin,
                         int             rMax,
@@ -1673,6 +1673,32 @@ int partSD_2D(options *opts,
     
     e_sum = 1; // have to initialize, otherwise loop won't start
 
+    // array for saving p, e, and d at different R's
+
+    // Index 0 = p, index 1 = d, index 2 = e
+
+    long int* PDE_sum = (long int *)malloc(sizeof(long int) * opts->maxR * 3);
+
+    memset(PDE_sum, 0, sizeof(long int) * opts->maxR * 3);
+
+    // Array for storing radii
+
+    int* R;
+    int* L;
+
+    if(opts->partLabel)
+    {
+        R = (int *)malloc(sizeof(int) * info->nElements);
+        L = (int *)malloc(sizeof(int) * info->nElements);
+
+        for(int i = 0; i < info->nElements; i++)
+        {
+            R[i] = -1;
+            L[i] = -1;
+        }
+
+    }
+
     // arrays for holding the EDM:
 
     int* EDT_D = (int *)malloc(sizeof(int) * info->nElements);
@@ -1709,7 +1735,7 @@ int partSD_2D(options *opts,
     {
         // copy P into D (probably not necessary)
 
-        memcpy(D, P, sizeof(bool) * info->nElements);
+        memcpy(D, B, sizeof(bool) * info->nElements);
 
         for (int i = 0; i < info->nElements; i++)
         {
@@ -1736,15 +1762,23 @@ int partSD_2D(options *opts,
         e_sum = 0;
         d_sum = 0;
         p_sum = 0;
-        #pragma omp parallel for reduction(+ : p_sum, d_sum, e_sum)
+#pragma omp parallel for reduction(+ : p_sum, d_sum, e_sum)
         for (int i = 0; i < info->nElements; i++)
         {
-            p_sum += P[i];
+            p_sum += B[i];
             d_sum += D[i];
             e_sum += E[i];
-            // if (P[i] - E[i] == 1 && R[i] == -1)
-            //     R[i] = radius;
+
+            if (!opts->partLabel)
+                continue;
+
+            if (P[i] - E[i] == 1 && R[i] == -1)
+                R[i] = radius;
         }
+
+        PDE_sum[(radius - 1) * 3 + 0] = p_sum;
+        PDE_sum[(radius - 1) * 3 + 1] = d_sum;
+        PDE_sum[(radius - 1) * 3 + 2] = e_sum;
 
         // print to output file
 
@@ -1754,7 +1788,48 @@ int partSD_2D(options *opts,
         // increment radius
         radius++;
     }
-    
+
+    int lastR = radius;
+
+    // calculate partSD and print to output file
+
+    long int sum_removed = 0;
+    double *partRemoved = (double *)malloc(sizeof(double) * lastR);
+
+    // get particles removed at R = 1
+
+    partRemoved[0] = PDE_sum[0 * 3 + 0] - PDE_sum[0 * 3 + 2];
+    sum_removed += (int)partRemoved[0];
+
+    for (int i = 1; i < lastR; i++)
+    {
+        partRemoved[i] = PDE_sum[(i - 1) * 3 + 2] - PDE_sum[i * 3 + 2];
+        sum_removed += (int)partRemoved[i];
+    }
+
+    FILE *partSD_OUT = fopen(opts->partSD_Out, "w+");
+
+    fprintf(partSD_OUT, "r,p(r)\n");
+    for (int i = 0; i < lastR; i++)
+    {
+        fprintf(partSD_OUT, "%d,%lf\n", i, (double)partRemoved[i] / sum_removed);
+    }
+
+    fclose(partSD_OUT);
+
+    // partial memory management
+
+    free(partRemoved);
+    free(PDE_sum);
+
+    // Derive particle labels from R, if applicable
+
+    if(opts->partLabel)
+    {
+        ParticleLabel2D(opts->radOff, lastR, R, L, info, opts);
+        saveLabels2D(R, L, info, opts->partLabel_Out);
+    }
+
     // memory management
 
     free(EDT_D);
@@ -1763,6 +1838,9 @@ int partSD_2D(options *opts,
     free(B);
     free(E);
     free(D);
+
+    free(R);
+    free(L);
 
     return 0;
 }
@@ -2214,8 +2292,8 @@ int ParticleSizeDist2D(bool debugMode)
     {
         // Label Particles
 
-        ParticleLabel2D(3, radius, R, L, &imgInfo);
-        saveLabels2D(P, R, L, &imgInfo, labelsOutput_name);
+        // ParticleLabel2D(3, radius, R, L, &imgInfo);
+        // saveLabels2D(P, R, L, &imgInfo, labelsOutput_name);
     }
 
     /*---------------------------------------------------------------------

@@ -18,6 +18,10 @@ int main(void){
 
     options opts;
 
+    // stdout - important call for efficiency on Linux
+
+    fflush(stdout);
+
     // read user input
 
     char input[100];
@@ -28,6 +32,9 @@ int main(void){
     if (opts.verbose)
         printOpts(&opts);
 
+    if(opts.nD == 2)
+        Sim2D(&opts);
+    
     return 0;
 
     // flags to determine which code to run
@@ -39,7 +46,7 @@ int main(void){
     particleFlag = true;
     poreFlag = false;
 
-    fflush(stdout);
+    
 
     if (input2D)
     {

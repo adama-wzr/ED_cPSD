@@ -16,14 +16,6 @@
 
 /*--------------------------------------------------------
 
-                     Constants
-
- --------------------------------------------------------*/
-
-#define MAX_R 100
-
-/*--------------------------------------------------------
-
                     Data structures
 
  --------------------------------------------------------*/
@@ -250,14 +242,17 @@ int readInput(char *inputFilename, options *opts)
         {
             opts->inputType = (int)tempD;
         }
+        else if (strcmp(tempC, "maxR:") == 0)
+        {
+            opts->maxR = (int)tempD;
+        }
     }
     return 0;
 }
 
 int readCSV(char*           target_name, 
             char*           P, 
-            sizeInfo*       structureInfo,
-            bool            debugFlag)
+            sizeInfo*       structureInfo)
 {
     // read data structure
 
@@ -291,8 +286,6 @@ int readCSV(char*           target_name,
 
     fscanf(target_data, "%c,%c,%c", &header[0], &header[1], &header[2]);
 
-    if (debugFlag) printf("Header = %s\n", header);
-
     // Read coordinates
 
     size_t count = 0;
@@ -302,8 +295,6 @@ int readCSV(char*           target_name,
     }
 
     // Build P based on the data we just read
-
-    memset(P, 0, sizeof(char)*nElements);
 
     int index = 0;
 
@@ -317,8 +308,8 @@ int readCSV(char*           target_name,
     free(x);
     free(y);
     free(z);
-    fclose(target_data);
 
+    fclose(target_data);
     return 0;
 }
 
@@ -2037,113 +2028,10 @@ int poreSD_2D(options *opts,
     return 0;
 }
 
-
-
-int particleSD_2D_Meijster( char*          P,
-                            char*          E, 
-                            char*          D,
-                            char*          R, 
-                            long int*      InterfaceArray, 
-                            int            radius, 
-                            int            numThreads, 
-                            char*          output_name,
-                            sizeInfo2D*    structureInfo,
-                            bool           debugFlag)
+int partSD_3D(options *opts, sizeInfo *info,char *P, int POI)
 {
-    // read data structure
-    int height, width;
-    height = structureInfo->height;
-    width = structureInfo->width;
-    long int nElements = structureInfo->nElements;
-
-    // loop variables
-
-    long int p_sum, d_sum, e_sum;
-    p_sum = 1;
-    e_sum = 1;
-    d_sum = 1;
-    int primaryPhase = 0;
-
-    int* EDT_Pore = (int *)malloc(sizeof(int)*nElements);
-    int* EDT_Particle = (int *)malloc(sizeof(int)*nElements);
-
-    memset(EDT_Pore, 0, sizeof(int)*nElements);
-    memset(EDT_Particle, 0, sizeof(int)*nElements);
-
-    omp_set_num_threads(numThreads);
-
-    // Open output file
-
-    FILE *OUT;
-
-    OUT = fopen(output_name, "w+");
-    fprintf(OUT, "R,P,E,D\n");
-
-    // EDT for particle only needs to be done once, since we copy P into E at the first step each time
-
-    // pMeijster2D(P, EDT_Particle, structureInfo, 0);
-
-    while (e_sum != 0 && radius < MAX_R )
-    {
-        memcpy(D,P,sizeof(char)*nElements);     // probably not necessary
-
-        for(int row = 0; row<height; row++)
-        {
-            for(int col = 0; col<width; col++)
-            {
-                if(EDT_Particle[row*width + col] <= radius*radius) D[row*width + col] = 0;
-            }
-        }
-
-        // copy D into E
-
-        memcpy(E, D, sizeof(char)*nElements);
-
-        // Meijster algorithm in D for pore-space EDT
-
-        // pMeijster2D(D, EDT_Pore, structureInfo, 1);
-
-        // Update D
-        for(int row = 0; row<height; row++)
-        {
-            for(int col = 0; col<width; col++)
-            {
-                if(EDT_Pore[row*width + col] <= radius*radius) E[row*width + col] = 1;
-            }
-        }
-
-        // evaluate sums 
-
-        e_sum = 0;
-        d_sum = 0;
-        p_sum = 0;
-        #pragma omp parallel for reduction(+:p_sum, d_sum, e_sum)
-        for(int i = 0; i<nElements; i++){
-            p_sum += P[i];
-            d_sum += D[i];
-            e_sum += E[i];
-            if(P[i] - E[i] == 1 && R[i] == -1) R[i] = radius;
-        }
-        
-        // print to output file
-
-        if(debugFlag) printf("R = %d, P = %ld, E = %ld, D = %ld\n", radius, p_sum, e_sum, d_sum);
-        fprintf(OUT, "%d,%ld,%ld,%ld\n", radius, p_sum, e_sum, d_sum);
-
-        radius++;
-    }
-
-    // close files
-    fclose(OUT);
-
-    // free memory on host
-
-    free(EDT_Particle);
-    free(EDT_Pore);
-
-    return radius;
+    return 0;
 }
-
 
 
 int particleSD_3D_Meijster( char*      P,
@@ -2215,7 +2103,7 @@ int particleSD_3D_Meijster( char*      P,
 
     long int interfaceCount = 0;
 
-    while (e_sum != 0 && radius < MAX_R )
+    while (e_sum != 0 && radius < 1 )
     {
         memcpy(D,P,sizeof(char)*nElements);     // probably not necessary
 
@@ -2352,17 +2240,8 @@ int Sim2D(options *opts)
     return 0;
 }
 
-
-
-int ParticleSizeDist2D(bool debugMode)
+int Sim3D(options *opts)
 {
-    if (debugMode)
-    {
-        printf("------------------------------------------------\n\n");
-        printf("       Particle Size Distribution 2D\n");
-        printf("               (Debug Mode)\n\n");
-        printf("------------------------------------------------\n\n");
-    }
     /*---------------------------------------------------------------------
     
                             Read Input
@@ -2370,154 +2249,41 @@ int ParticleSizeDist2D(bool debugMode)
                           Declare Arrays 
 
         Input mode flags:
-        - Flag = 0 means jpg image (using stb image).
-        - Flag = 1 means tiff file.             (NOT IMPLEMENTED)
+        - Flag = 0 means .csv file with x,y,z coordinates of the particles.
+        - Flag = 1 means stack of .jpg files    (NOT IMPLEMENTED)
+        - Flag = 2 means tiff file.             (NOT IMPLEMENTED)
 
     ------------------------------------------------------------------------*/
 
-    // User set variables
+    // Structs
 
-    int radius_offset = 0;
-    int radius = 1;
+    sizeInfo info;
 
-    unsigned char* target_img;
-    sizeInfo2D imgInfo;
-    char targetName[50];
-    char output_name[100];
-    bool saveLabels = false;
+    // Expected structure size
 
-    char labelsOutput_name[100];
+    info.width = opts->width;
+    info.height = opts->height;
+    info.depth = opts->depth;
+    info.nElements = info.depth * info.width * info.height;
 
-    // File names
+    // Declare and Define Phase array
 
-    sprintf(targetName, "00000.jpg");
-    sprintf(output_name, "00_ED_test.csv");
+    char* P = (char *)malloc(sizeof(char) * info.nElements);
 
-    sprintf(labelsOutput_name, "Test_labels2D.csv");
+    memset(P, 0, sizeof(char) * info.nElements);
 
-    // Parallel Computing Options Options
+    // read csv
 
-    int numThreads = 8;                         // Number of CPU threads to be used
+    readCSV(opts->inputFilename, P, &info);
 
-    // Read image
+    // Perform selected simulations
 
-    if (readImg_2D( targetName, &target_img, &imgInfo) == 1) printf("Error, image has wrong number of channels\n");
-
-    if(readImg_2D( targetName, &target_img, &imgInfo) == 1) return 1;
-
-    char* P = (char *)malloc(sizeof(char)*imgInfo.nElements);
-
-    memset(P, 0, sizeof(char)*imgInfo.nElements);
-
-    // Cast image into P, free original array
-
-    for(int i = 0; i < imgInfo.nElements; i++)
-    {
-        if(target_img[i] < 150)
-        {
-            P[i] = 0;
-        }else
-        {
-            P[i] = 1;
-        }
-    }
-
-    // return 0;
-
-    free(target_img);
-
-    // Allocate Space for Erosion-Dilation
-
-    char *E = (char *)malloc(sizeof(char)*imgInfo.nElements);
-    char *D = (char *)malloc(sizeof(char)*imgInfo.nElements);
-
-    // Initialize ED arrays
-
-    memset(E, 0, sizeof(char) * imgInfo.nElements);
-    memset(D, 0, sizeof(char) * imgInfo.nElements);
-
-    // Label Arrays
-
-    char *R = (char *)malloc(sizeof(char)* imgInfo.nElements);        // array for particle radius
-    int  *L =  (int *)malloc(sizeof(int) * imgInfo.nElements);        // array for particle labels
-
-    // Interface array
-
-    long int *InterfaceArray = (long int *)malloc(sizeof(long int) * imgInfo.nElements);
-
-    // Initialize label arrays and Interface Array
-
-    memset(R,                0, sizeof(char)    * imgInfo.nElements);
-    memset(L,                0, sizeof(int)     * imgInfo.nElements);
-    memset(InterfaceArray,   0, sizeof(long int)* imgInfo.nElements);
-
-    if (debugMode) printf("Structure Read\n");
-
-    // Prepare variables for the main loop
-
-    for(long int i = 0; i<imgInfo.nElements; i++)
-    {
-        R[i] = -1;
-        L[i] = -1;
-    }
-
-    // set radius offset, if any
-
-    if(radius_offset > 0) radius = radius_offset;
-
-    /*---------------------------------------------------------------------
+    if(opts->partSD)
+        partSD_3D(opts, &info, P, 1);
     
-                            Main Loop
+    // if(opts->poreSD)
+    //     poreSD_3D(opts, &imgInfo, P, 0);
 
-    ------------------------------------------------------------------------*/
-
-    if (debugMode) printf("Starting Main Loop\n");
-
-    // radius = Hybrid_particleSD_2D(P, E, D, R, InterfaceArray, radius,
-    //                               numThreads, output_name, &imgInfo, debugMode);
-
-    radius = particleSD_2D_Meijster(P, E, D, R, InterfaceArray, radius,
-                                    numThreads, output_name, &imgInfo, debugMode);
-
-    /*---------------------------------------------------------------------
-    
-                            Save Labels
-
-    ------------------------------------------------------------------------*/
-
-    if(saveLabels)
-    {
-        // Label Particles
-
-        // ParticleLabel2D(3, radius, R, L, &imgInfo);
-        // saveLabels2D(P, R, L, &imgInfo, labelsOutput_name);
-    }
-
-    /*---------------------------------------------------------------------
-    
-                            Memory Management
-
-    ------------------------------------------------------------------------*/
-
-    free(P);
-    free(E);
-    free(D);
-    free(InterfaceArray);
-    free(R);
-    free(L);
-    return 0;
-}
-
-
-int PoreSizeDist2D(bool debugMode)
-{
-    if (debugMode)
-    {
-        printf("------------------------------------------------\n\n");
-        printf("         Pore Size Distribution 2D\n");
-        printf("             (Debug Mode)\n\n");
-        printf("------------------------------------------------\n\n");
-    }
     return 0;
 }
 
@@ -2614,7 +2380,7 @@ int ParticleSizeDist3D(bool debugMode)
     {
         if (debugMode) printf("Reading .csv\n");
         sprintf(target_name, "rec_837_300_int1.csv");
-        readCSV(target_name, P, &structureInfo, debugMode);
+        readCSV(target_name, P, &structureInfo);
     } else if(inputMode == 1)
     {
         if (debugMode) printf("Reading Stack\n");

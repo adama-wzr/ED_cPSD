@@ -2127,7 +2127,7 @@ int partSD_3D(options *opts,
 
         // Meijster in D
 
-        pMeijster3D_debug(B, EDT_E, info, 1);
+        pMeijster3D_debug(D, EDT_E, info, 1);
 
         // Update E
 
@@ -2153,7 +2153,7 @@ int partSD_3D(options *opts,
             if (!opts->partLabel)
                 continue;
 
-            if (P[i] - E[i] == 1 && R[i] == -1)
+            if (B[i] - E[i] == 1 && R[i] == -1)
                 R[i] = radius;
         }
 
@@ -2325,7 +2325,7 @@ int poreSD_3D(options *opts,
 
         // Meijster in D
 
-        pMeijster3D_debug(B, EDT_E, info, 1);
+        pMeijster3D_debug(D, EDT_E, info, 1);
 
         // Update E
 
@@ -2351,7 +2351,7 @@ int poreSD_3D(options *opts,
             if (!opts->poreLabel)
                 continue;
 
-            if (P[i] - E[i] == 1 && R[i] == -1)
+            if (B[i] - E[i] == 1 && R[i] == -1)
                 R[i] = radius;
         }
 
@@ -2538,8 +2538,8 @@ int Sim3D(options *opts)
     if(opts->partSD)
         partSD_3D(opts, &info, P, 1);
     
-    // if(opts->poreSD)
-    //     poreSD_3D(opts, &imgInfo, P, 0);
+    if(opts->poreSD)
+        poreSD_3D(opts, &info, P, 0);
 
     free(P);
 

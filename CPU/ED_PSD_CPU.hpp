@@ -42,6 +42,7 @@ typedef struct
     unsigned char TH;
     int maxR;
     int radOff;
+    int stackSize;
 } options;
 
 typedef struct
@@ -92,23 +93,43 @@ void printOpts(options *opts)
             printf("Input Name: %s\n", opts->inputFilename);
             printf("Phase Threshold: %d\n", (int)opts->TH);
         }
-        // options related to simulation type
-        if (opts->poreSD)
+    }else if(opts->nD == 3)
+    {
+        if (opts->inputType == 0)
         {
-            printf("Pore Size Distribution Output: %s\n", opts->poreSD_Out);
+            printf("Input Name: %s\n", opts->inputFilename);
+            printf("Width  = %d\n", opts->width);
+            printf("Height = %d\n", opts->height);
+            printf("Depth  = %d\n", opts->depth);
         }
-        if (opts->poreLabel)
+        else if (opts->inputType == 1)
         {
-            printf("Pore Label Output: %s\n", opts->poreLabel_Out);
+            printf("Stack Mode selected\n");
+            printf("Stack size = %d\n", opts->stackSize);
         }
-        if (opts->partSD)
+        else
         {
-            printf("Partciel Size Distribution Output: %s\n", opts->partSD_Out);
+            printf("Option not yet implemented. Exiting with error status.\n");
+            return;
         }
-        if (opts->partLabel)
-        {
-            printf("Particle Label Output: %s\n", opts->partLabel_Out);
-        }
+    }
+
+    // options related to simulation type
+    if (opts->poreSD)
+    {
+        printf("Pore Size Distribution Output: %s\n", opts->poreSD_Out);
+    }
+    if (opts->poreLabel)
+    {
+        printf("Pore Label Output: %s\n", opts->poreLabel_Out);
+    }
+    if (opts->partSD)
+    {
+        printf("Partciel Size Distribution Output: %s\n", opts->partSD_Out);
+    }
+    if (opts->partLabel)
+    {
+        printf("Particle Label Output: %s\n", opts->partLabel_Out);
     }
 
     // nThreads
@@ -158,6 +179,8 @@ int readInput(char *inputFilename, options *opts)
     opts->TH = 128;
     opts->maxR = 100;
     opts->radOff = 0;
+
+    opts->stackSize = 1;
 
     /*
     --------------------------------------------------------------------------------
@@ -998,6 +1021,9 @@ int partSD_2D(options *opts,
             - char phase of interest
     */
 
+    if(opts->verbose)
+        printf("Particle-Size Distribution 2D:\n");
+
     // Loop variables
 
     long int p_sum, d_sum, e_sum;
@@ -1194,6 +1220,9 @@ int poreSD_2D(options *opts,
             - char phase of interest
     */
 
+    if(opts->verbose)
+        printf("Pore-Size Distribution 2D:\n");
+
     // Loop variables
 
     long int p_sum, d_sum, e_sum;
@@ -1384,6 +1413,9 @@ int partSD_3D(options *opts,
             - pointer to phase-array
             - char phase of interest
     */
+
+    if(opts->verbose)
+        printf("Particle-Size Distribution 3D:\n");
 
     // Loop variables
 
@@ -1582,6 +1614,9 @@ int poreSD_3D(options *opts,
             - pointer to phase-array
             - char phase of interest
     */
+
+    if(opts->verbose)
+        printf("Pore-Size Distribution 3D:\n");
 
     // Loop variables
 

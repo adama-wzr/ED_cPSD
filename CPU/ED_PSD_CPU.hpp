@@ -43,6 +43,7 @@ typedef struct
     int maxR;
     int radOff;
     int stackSize;
+    char LeadZero;
 } options;
 
 typedef struct
@@ -106,6 +107,8 @@ void printOpts(options *opts)
         {
             printf("Stack Mode selected\n");
             printf("Stack size = %d\n", opts->stackSize);
+            printf("Stack Threshold = %d\n", opts->TH);
+            printf("Leading Zeroes: %d\n", (int)opts->LeadZero);
         }
         else
         {
@@ -181,6 +184,7 @@ int readInput(char *inputFilename, options *opts)
     opts->radOff = 0;
 
     opts->stackSize = 1;
+    opts->LeadZero = 5;
 
     /*
     --------------------------------------------------------------------------------
@@ -269,6 +273,15 @@ int readInput(char *inputFilename, options *opts)
         {
             opts->maxR = (int)tempD;
         }
+        else if (strcmp(tempC, "leadZero:") == 0)
+        {
+            opts->LeadZero = (char)tempD;
+        }
+        else if (strcmp(tempC, "nSlices:") == 0)
+        {
+            opts->stackSize = (int)tempD;
+        }
+        
     }
     return 0;
 }
@@ -354,8 +367,7 @@ int readImg_2D( char*           target_name,
 
 
 int readStack   (char           *P,
-                sizeInfo*       structureInfo,
-                bool            debugMode)
+                options*        opts)
 {
     long int index;
 
@@ -363,63 +375,43 @@ int readStack   (char           *P,
 
     sizeInfo2D tempSize;
 
-    unsigned char* target_img;
-
-    for(int sliceNum = 0; sliceNum < structureInfo->depth; sliceNum++)
+    for(int sliceNum = 0; sliceNum < opts->stackSize; sliceNum++)
     {
+        // pointer to store image
+
+        unsigned char* target_img;
+
         // get image name
-        sprintf(imgName, "%05d.jpg", sliceNum);
+        sprintf(imgName, "%0*ld.jpg", opts->LeadZero, sliceNum);
         
         // read image
 
-        if(readImg_2D(imgName, &target_img, &tempSize) == 1)
+        bool flag = 0;
+
+        flag = readImg_2D(imgName, &target_img, &tempSize);
+
+        if(flag == 1)
         {
             // print error if wrong number of channels and debugMode is on
-            if (debugMode) printf("Wrong number of channels on image %d\n", sliceNum);
+            if (opts->verbose) printf("Wrong number of channels on image %0*d\n", (int)opts->LeadZero, sliceNum);
             return 1;
         }
-
-        // Check that the image is the appropriate size
-        // return error statements if the debugFlag is on.
         
-        if (structureInfo->width != tempSize.width)
-        {
-            if(debugMode)
-            {
-                printf("Dimension mismatch on slice %d\n", sliceNum);
-                printf("Expected Width = %d\n", structureInfo->width);
-                printf("Actual Width   = %d\n", tempSize.width);
-            }
-            return 1;
-        } else if(structureInfo->height != tempSize.height)
-        {
-            if(debugMode)
-            {
-                printf("Dimension mismatch on slice %d\n", sliceNum);
-                printf("Expected Height = %d\n", structureInfo->height);
-                printf("Actual Height   = %d\n", tempSize.height);
-            }
-            return 1;
-        }
-
         // use the information we just read to populate the 3d structure
-
         for(int rowNum = 0; rowNum < tempSize.height; rowNum++)
         {
             for(int colNum = 0; colNum < tempSize.width; colNum++)
             {
                 index = sliceNum*tempSize.width*tempSize.height +        \
                         rowNum*tempSize.width + colNum;
-                // thresholding at 150
-                if (target_img[rowNum*tempSize.width + colNum] < 150) P[index] = 0;
+                // thresholding at opts->TH
+                if (target_img[rowNum*tempSize.width + colNum] < opts->TH) P[index] = 0;
                 else P[index] = 1;
             }
         }
+        free(target_img);
     }
 
-    // Free memory
-
-    free(target_img);
     return 0;
 }
 
@@ -1188,6 +1180,9 @@ int partSD_2D(options *opts,
     {
         ParticleLabel2D(opts->radOff, lastR, R, L, info);
         saveLabels2D(R, L, info, opts->partLabel_Out);
+
+        free(R);
+        free(L);
     }
 
     // memory management
@@ -1198,9 +1193,6 @@ int partSD_2D(options *opts,
     free(B);
     free(E);
     free(D);
-
-    free(R);
-    free(L);
 
     return 0;
 }
@@ -1383,6 +1375,9 @@ int poreSD_2D(options *opts,
     {
         ParticleLabel2D(opts->radOff, lastR, R, L, info);
         saveLabels2D(R, L, info, opts->poreLabel_Out);
+        
+        free(R);
+        free(L);
     }
 
     // memory management
@@ -1394,8 +1389,7 @@ int poreSD_2D(options *opts,
     free(E);
     free(D);
 
-    free(R);
-    free(L);
+    
 
     return 0;
 }
@@ -1584,6 +1578,8 @@ int partSD_3D(options *opts,
     {
         ParticleLabel3D(opts->radOff, lastR, R, L, info);
         saveLabels3D(R, L, info, opts->partLabel_Out);
+        free(R);
+        free(L);
     }
 
     // memory management
@@ -1594,9 +1590,6 @@ int partSD_3D(options *opts,
     free(B);
     free(E);
     free(D);
-
-    free(R);
-    free(L);
 
     return 0;
 }
@@ -1783,6 +1776,9 @@ int poreSD_3D(options *opts,
     {
         ParticleLabel3D(opts->radOff, lastR, R, L, info);
         saveLabels3D(R, L, info, opts->poreLabel_Out);
+
+        free(R);
+        free(L);
     }
 
     // memory management
@@ -1793,9 +1789,6 @@ int poreSD_3D(options *opts,
     free(B);
     free(E);
     free(D);
-
-    free(R);
-    free(L);
 
     return 0;
 }
@@ -1816,7 +1809,6 @@ int Sim2D(options *opts)
 
         Input mode flags:
         - Flag = 0 means jpg image (using stb image).
-        - Flag = 1 means tiff file.             (NOT IMPLEMENTED)
 
     ------------------------------------------------------------------------*/
 
@@ -1883,42 +1875,75 @@ int Sim3D(options *opts)
 
         Input mode flags:
         - Flag = 0 means .csv file with x,y,z coordinates of the particles.
-        - Flag = 1 means stack of .jpg files    (NOT IMPLEMENTED)
-        - Flag = 2 means tiff file.             (NOT IMPLEMENTED)
-
+        - Flag = 1 means stack of .jpg files
     ------------------------------------------------------------------------*/
 
     // Structs
 
     sizeInfo info;
 
-    // Expected structure size
+    // define P
 
-    info.width = opts->width;
-    info.height = opts->height;
-    info.depth = opts->depth;
-    info.nElements = info.depth * info.width * info.height;
+    char* P;
 
-    // set omp options
+    // read by input type
 
-    omp_set_num_threads(opts->nThreads);
+    if(opts->inputType == 0)
+    {
+        // Expected structure size
 
-    // Declare and Define Phase array
+        info.width = opts->width;
+        info.height = opts->height;
+        info.depth = opts->depth;
+        info.nElements = info.depth * info.width * info.height;
 
-    char* P = (char *)malloc(sizeof(char) * info.nElements);
+        // set omp options
 
-    memset(P, 0, sizeof(char) * info.nElements);
+        omp_set_num_threads(opts->nThreads);
 
-    // read csv
+        // Declare and Define Phase array
 
-    readCSV(opts->inputFilename, P, &info);
+        P = (char *)malloc(sizeof(char) * info.nElements);
+
+        memset(P, 0, sizeof(char) * info.nElements);
+        // read csv
+        readCSV(opts->inputFilename, P, &info);
+    }
+    else if (opts->inputType == 1)
+    {
+        // read one image to get size
+        info.depth = opts->stackSize;
+
+        unsigned char *target_practice;
+
+        char test_name[100];
+
+        sprintf(test_name, "%0*d.jpg", opts->LeadZero, 0);
+
+        int channel;
+
+        target_practice = stbi_load(test_name, &info.width, &info.height, &channel, 1);
+
+        free(target_practice);
+        // set size of P
+
+        info.nElements = info.width * info.height * info.depth;
+
+        P = (char *)malloc(sizeof(char) * info.nElements);
+
+        memset(P, 0, sizeof(char) * info.nElements);
+
+        // read stack onto P
+
+        readStack(P, opts);
+    }
 
     // Perform selected simulations
 
-    if(opts->partSD)
+    if (opts->partSD)
         partSD_3D(opts, &info, P, 1);
-    
-    if(opts->poreSD)
+
+    if (opts->poreSD)
         poreSD_3D(opts, &info, P, 0);
 
     free(P);

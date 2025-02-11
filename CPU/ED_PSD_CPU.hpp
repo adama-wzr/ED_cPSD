@@ -1201,7 +1201,11 @@ int partSD_2D(options *opts,
     {
         ParticleLabel2D(opts->radOff, lastR, R, L, info);
         saveLabels2D(R, L, info, opts->partLabel_Out);
+<<<<<<< Updated upstream
 
+=======
+        // Free R and L
+>>>>>>> Stashed changes
         free(R);
         free(L);
     }
@@ -1394,7 +1398,11 @@ int poreSD_2D(options *opts,
     {
         ParticleLabel2D(opts->radOff, lastR, R, L, info);
         saveLabels2D(R, L, info, opts->poreLabel_Out);
+<<<<<<< Updated upstream
 
+=======
+        // Free R and L
+>>>>>>> Stashed changes
         free(R);
         free(L);
     }
@@ -1595,6 +1603,10 @@ int partSD_3D(options *opts,
     {
         ParticleLabel3D(opts->radOff, lastR, R, L, info);
         saveLabels3D(R, L, info, opts->partLabel_Out);
+<<<<<<< Updated upstream
+=======
+        // Free R and L
+>>>>>>> Stashed changes
         free(R);
         free(L);
     }
@@ -1794,6 +1806,10 @@ int poreSD_3D(options *opts,
         ParticleLabel3D(opts->radOff, lastR, R, L, info);
         saveLabels3D(R, L, info, opts->poreLabel_Out);
 
+<<<<<<< Updated upstream
+=======
+        // Free R and L
+>>>>>>> Stashed changes
         free(R);
         free(L);
     }

@@ -1,0 +1,1140 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>800</width>
+    <height>600</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>MainWindow</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <widget class="QTabWidget" name="tabWidget">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>10</y>
+      <width>771</width>
+      <height>561</height>
+     </rect>
+    </property>
+    <property name="currentIndex">
+     <number>0</number>
+    </property>
+    <widget class="QWidget" name="tab">
+     <attribute name="title">
+      <string>2D</string>
+     </attribute>
+     <widget class="QLabel" name="FilenameLabel2D">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>55</y>
+        <width>201</width>
+        <height>16</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Enter input file name below:</string>
+      </property>
+     </widget>
+     <widget class="QLineEdit" name="FilenameInput2D">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>75</y>
+        <width>261</width>
+        <height>31</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QPushButton" name="GenButton2D">
+      <property name="geometry">
+       <rect>
+        <x>360</x>
+        <y>470</y>
+        <width>131</width>
+        <height>31</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Generate</string>
+      </property>
+     </widget>
+     <widget class="QTextEdit" name="textDisplay2D">
+      <property name="geometry">
+       <rect>
+        <x>340</x>
+        <y>30</y>
+        <width>401</width>
+        <height>411</height>
+       </rect>
+      </property>
+      <property name="readOnly">
+       <bool>true</bool>
+      </property>
+     </widget>
+     <widget class="QPushButton" name="saveButton2D">
+      <property name="geometry">
+       <rect>
+        <x>590</x>
+        <y>470</y>
+        <width>131</width>
+        <height>31</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Save</string>
+      </property>
+     </widget>
+     <widget class="QCheckBox" name="poreSD">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>161</y>
+        <width>141</width>
+        <height>20</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Pore-size distribution</string>
+      </property>
+     </widget>
+     <widget class="QLabel" name="label">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>141</y>
+        <width>251</width>
+        <height>14</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Select expected outputs:</string>
+      </property>
+     </widget>
+     <widget class="QCheckBox" name="partSD">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>181</y>
+        <width>161</width>
+        <height>20</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Particle-size distribution</string>
+      </property>
+     </widget>
+     <widget class="QCheckBox" name="poreLabel">
+      <property name="geometry">
+       <rect>
+        <x>190</x>
+        <y>161</y>
+        <width>101</width>
+        <height>20</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Pore Labels</string>
+      </property>
+      <property name="checkable">
+       <bool>false</bool>
+      </property>
+     </widget>
+     <widget class="QCheckBox" name="partLabel">
+      <property name="geometry">
+       <rect>
+        <x>190</x>
+        <y>181</y>
+        <width>121</width>
+        <height>20</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Particle Labels</string>
+      </property>
+      <property name="checkable">
+       <bool>false</bool>
+      </property>
+     </widget>
+     <widget class="QLineEdit" name="poreSD_Out">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>225</y>
+        <width>261</width>
+        <height>22</height>
+       </rect>
+      </property>
+      <property name="readOnly">
+       <bool>true</bool>
+      </property>
+     </widget>
+     <widget class="QLabel" name="label_2">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>205</y>
+        <width>241</width>
+        <height>14</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>File name for saving pore-size distribution:</string>
+      </property>
+     </widget>
+     <widget class="QLabel" name="label_3">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>255</y>
+        <width>261</width>
+        <height>14</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>File name for saving particle-size distribution:</string>
+      </property>
+     </widget>
+     <widget class="QLineEdit" name="partSD_Out">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>275</y>
+        <width>261</width>
+        <height>22</height>
+       </rect>
+      </property>
+      <property name="readOnly">
+       <bool>true</bool>
+      </property>
+     </widget>
+     <widget class="QLabel" name="label_4">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>305</y>
+        <width>231</width>
+        <height>14</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>File for saving pore labels:</string>
+      </property>
+     </widget>
+     <widget class="QLineEdit" name="poreLabel_Out">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>325</y>
+        <width>261</width>
+        <height>22</height>
+       </rect>
+      </property>
+      <property name="readOnly">
+       <bool>true</bool>
+      </property>
+     </widget>
+     <widget class="QLabel" name="label_5">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>355</y>
+        <width>181</width>
+        <height>14</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>File for saving particle labels:</string>
+      </property>
+     </widget>
+     <widget class="QLineEdit" name="partLabel_Out">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>375</y>
+        <width>261</width>
+        <height>22</height>
+       </rect>
+      </property>
+      <property name="readOnly">
+       <bool>true</bool>
+      </property>
+     </widget>
+     <widget class="QLabel" name="input2D_ext">
+      <property name="geometry">
+       <rect>
+        <x>283</x>
+        <y>80</y>
+        <width>41</width>
+        <height>20</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>.jpg</string>
+      </property>
+     </widget>
+     <widget class="QLabel" name="label_7">
+      <property name="geometry">
+       <rect>
+        <x>281</x>
+        <y>230</y>
+        <width>31</width>
+        <height>14</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>.csv</string>
+      </property>
+     </widget>
+     <widget class="QLabel" name="label_8">
+      <property name="geometry">
+       <rect>
+        <x>282</x>
+        <y>278</y>
+        <width>31</width>
+        <height>14</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>.csv</string>
+      </property>
+     </widget>
+     <widget class="QLabel" name="label_9">
+      <property name="geometry">
+       <rect>
+        <x>283</x>
+        <y>329</y>
+        <width>31</width>
+        <height>14</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>.csv</string>
+      </property>
+     </widget>
+     <widget class="QLabel" name="label_10">
+      <property name="geometry">
+       <rect>
+        <x>283</x>
+        <y>378</y>
+        <width>31</width>
+        <height>14</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>.csv</string>
+      </property>
+     </widget>
+     <widget class="QLabel" name="label_11">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>417</y>
+        <width>141</width>
+        <height>14</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Number of CPU Cores: </string>
+      </property>
+     </widget>
+     <widget class="QSpinBox" name="nThreads">
+      <property name="geometry">
+       <rect>
+        <x>161</x>
+        <y>412</y>
+        <width>61</width>
+        <height>29</height>
+       </rect>
+      </property>
+      <property name="minimum">
+       <number>1</number>
+      </property>
+      <property name="maximum">
+       <number>1280</number>
+      </property>
+     </widget>
+     <widget class="QCheckBox" name="batchMode2D">
+      <property name="geometry">
+       <rect>
+        <x>250</x>
+        <y>456</y>
+        <width>81</width>
+        <height>20</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Batch Mode</string>
+      </property>
+     </widget>
+     <widget class="QCheckBox" name="verbose2D">
+      <property name="geometry">
+       <rect>
+        <x>250</x>
+        <y>420</y>
+        <width>81</width>
+        <height>20</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Verbose</string>
+      </property>
+      <property name="checked">
+       <bool>true</bool>
+      </property>
+     </widget>
+     <widget class="QSpinBox" name="Gray_TH">
+      <property name="geometry">
+       <rect>
+        <x>160</x>
+        <y>110</y>
+        <width>61</width>
+        <height>29</height>
+       </rect>
+      </property>
+      <property name="minimum">
+       <number>1</number>
+      </property>
+      <property name="maximum">
+       <number>255</number>
+      </property>
+      <property name="singleStep">
+       <number>1</number>
+      </property>
+      <property name="value">
+       <number>127</number>
+      </property>
+     </widget>
+     <widget class="QLabel" name="label_13">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>117</y>
+        <width>141</width>
+        <height>14</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Grayscale Threshold</string>
+      </property>
+     </widget>
+     <widget class="QSpinBox" name="r_off_2D">
+      <property name="geometry">
+       <rect>
+        <x>161</x>
+        <y>450</y>
+        <width>61</width>
+        <height>31</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QLabel" name="label_14">
+      <property name="geometry">
+       <rect>
+        <x>11</x>
+        <y>460</y>
+        <width>81</width>
+        <height>16</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Radius Offset:</string>
+      </property>
+     </widget>
+     <widget class="QLabel" name="label_15">
+      <property name="geometry">
+       <rect>
+        <x>11</x>
+        <y>499</y>
+        <width>81</width>
+        <height>16</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Max. Radius:</string>
+      </property>
+     </widget>
+     <widget class="QSpinBox" name="maxR_2D">
+      <property name="geometry">
+       <rect>
+        <x>161</x>
+        <y>490</y>
+        <width>61</width>
+        <height>31</height>
+       </rect>
+      </property>
+      <property name="minimum">
+       <number>1</number>
+      </property>
+      <property name="maximum">
+       <number>100000</number>
+      </property>
+      <property name="value">
+       <number>100</number>
+      </property>
+     </widget>
+     <widget class="QLabel" name="FilenameLabel2D_3">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>0</y>
+        <width>81</width>
+        <height>16</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Folder Path:</string>
+      </property>
+     </widget>
+     <widget class="QLineEdit" name="FilenameInput2D_2">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>20</y>
+        <width>261</width>
+        <height>31</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QPushButton" name="searchFolder_2">
+      <property name="geometry">
+       <rect>
+        <x>278</x>
+        <y>24</y>
+        <width>41</width>
+        <height>21</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>...</string>
+      </property>
+     </widget>
+    </widget>
+    <widget class="QWidget" name="tab_2">
+     <attribute name="title">
+      <string>3D</string>
+     </attribute>
+     <widget class="QTextEdit" name="textDisplay3D">
+      <property name="geometry">
+       <rect>
+        <x>380</x>
+        <y>20</y>
+        <width>371</width>
+        <height>421</height>
+       </rect>
+      </property>
+      <property name="readOnly">
+       <bool>true</bool>
+      </property>
+     </widget>
+     <widget class="QPushButton" name="saveButton3D">
+      <property name="geometry">
+       <rect>
+        <x>620</x>
+        <y>470</y>
+        <width>131</width>
+        <height>31</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Save</string>
+      </property>
+     </widget>
+     <widget class="QPushButton" name="GenButton3D">
+      <property name="geometry">
+       <rect>
+        <x>390</x>
+        <y>470</y>
+        <width>131</width>
+        <height>31</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Generate</string>
+      </property>
+     </widget>
+     <widget class="QStackedWidget" name="stackedWidget_input3D">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>50</y>
+        <width>351</width>
+        <height>211</height>
+       </rect>
+      </property>
+      <property name="currentIndex">
+       <number>0</number>
+      </property>
+      <widget class="QWidget" name="jpgStack">
+       <widget class="QScrollArea" name="scrollArea">
+        <property name="geometry">
+         <rect>
+          <x>19</x>
+          <y>9</y>
+          <width>311</width>
+          <height>131</height>
+         </rect>
+        </property>
+        <property name="widgetResizable">
+         <bool>true</bool>
+        </property>
+        <widget class="QWidget" name="scrollAreaWidgetContents">
+         <property name="geometry">
+          <rect>
+           <x>0</x>
+           <y>0</y>
+           <width>309</width>
+           <height>129</height>
+          </rect>
+         </property>
+         <layout class="QGridLayout" name="gridLayout_2">
+          <item row="1" column="0">
+           <widget class="QLabel" name="label_17">
+            <property name="text">
+             <string>Leading Zeroes:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="0">
+           <widget class="QLabel" name="label_18">
+            <property name="text">
+             <string>Grayscale Threshold</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1" colspan="2">
+           <widget class="QSpinBox" name="StackSize3D">
+            <property name="minimum">
+             <number>1</number>
+            </property>
+            <property name="maximum">
+             <number>100000</number>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1" colspan="2">
+           <widget class="QSpinBox" name="Gray_TH_3D">
+            <property name="minimum">
+             <number>1</number>
+            </property>
+            <property name="maximum">
+             <number>255</number>
+            </property>
+            <property name="singleStep">
+             <number>1</number>
+            </property>
+            <property name="value">
+             <number>127</number>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="0">
+           <widget class="QLabel" name="label_16">
+            <property name="text">
+             <string>Stack Size:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1" colspan="2">
+           <widget class="QSpinBox" name="LeadingZeros3D">
+            <property name="maximum">
+             <number>7</number>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </widget>
+      </widget>
+      <widget class="QWidget" name="csv">
+       <widget class="QScrollArea" name="scrollArea_3">
+        <property name="geometry">
+         <rect>
+          <x>10</x>
+          <y>10</y>
+          <width>311</width>
+          <height>181</height>
+         </rect>
+        </property>
+        <property name="widgetResizable">
+         <bool>true</bool>
+        </property>
+        <widget class="QWidget" name="scrollAreaWidgetContents_3">
+         <property name="geometry">
+          <rect>
+           <x>0</x>
+           <y>0</y>
+           <width>309</width>
+           <height>179</height>
+          </rect>
+         </property>
+         <widget class="QLineEdit" name="FilenameInput3D_csv">
+          <property name="geometry">
+           <rect>
+            <x>10</x>
+            <y>24</y>
+            <width>261</width>
+            <height>31</height>
+           </rect>
+          </property>
+         </widget>
+         <widget class="QLabel" name="input2D_ext_2">
+          <property name="geometry">
+           <rect>
+            <x>276</x>
+            <y>30</y>
+            <width>41</width>
+            <height>20</height>
+           </rect>
+          </property>
+          <property name="text">
+           <string>.csv</string>
+          </property>
+         </widget>
+         <widget class="QLabel" name="FilenameLabel2D_2">
+          <property name="geometry">
+           <rect>
+            <x>10</x>
+            <y>4</y>
+            <width>201</width>
+            <height>16</height>
+           </rect>
+          </property>
+          <property name="text">
+           <string>Enter input file name below:</string>
+          </property>
+         </widget>
+         <widget class="QWidget" name="layoutWidget">
+          <property name="geometry">
+           <rect>
+            <x>20</x>
+            <y>60</y>
+            <width>121</width>
+            <height>101</height>
+           </rect>
+          </property>
+          <layout class="QGridLayout" name="gridLayout_4">
+           <item row="0" column="0">
+            <widget class="QLabel" name="label_33">
+             <property name="text">
+              <string>Height:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="1">
+            <widget class="QSpinBox" name="height3D">
+             <property name="minimum">
+              <number>1</number>
+             </property>
+             <property name="maximum">
+              <number>10000</number>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="0">
+            <widget class="QLabel" name="label_34">
+             <property name="text">
+              <string>Width:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="1">
+            <widget class="QSpinBox" name="width3D">
+             <property name="minimum">
+              <number>1</number>
+             </property>
+             <property name="maximum">
+              <number>10000</number>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="0">
+            <widget class="QLabel" name="label_35">
+             <property name="text">
+              <string>Depth:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="1">
+            <widget class="QSpinBox" name="depth3D">
+             <property name="minimum">
+              <number>1</number>
+             </property>
+             <property name="maximum">
+              <number>10000</number>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </widget>
+       </widget>
+      </widget>
+     </widget>
+     <widget class="QLabel" name="label_6">
+      <property name="geometry">
+       <rect>
+        <x>27</x>
+        <y>12</y>
+        <width>111</width>
+        <height>16</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Enter Input Type:</string>
+      </property>
+     </widget>
+     <widget class="QComboBox" name="inputType3D">
+      <property name="geometry">
+       <rect>
+        <x>127</x>
+        <y>8</y>
+        <width>101</width>
+        <height>22</height>
+       </rect>
+      </property>
+      <item>
+       <property name="text">
+        <string>Stack .jpg</string>
+       </property>
+      </item>
+      <item>
+       <property name="text">
+        <string>.csv</string>
+       </property>
+      </item>
+     </widget>
+     <widget class="QCheckBox" name="verbose3D">
+      <property name="geometry">
+       <rect>
+        <x>250</x>
+        <y>10</y>
+        <width>101</width>
+        <height>20</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Verbose</string>
+      </property>
+      <property name="checked">
+       <bool>true</bool>
+      </property>
+     </widget>
+     <widget class="QLabel" name="label_30">
+      <property name="geometry">
+       <rect>
+        <x>25</x>
+        <y>40</y>
+        <width>141</width>
+        <height>16</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Input Specific Settings:</string>
+      </property>
+     </widget>
+     <widget class="QScrollArea" name="scrollArea_2">
+      <property name="geometry">
+       <rect>
+        <x>20</x>
+        <y>270</y>
+        <width>351</width>
+        <height>251</height>
+       </rect>
+      </property>
+      <property name="widgetResizable">
+       <bool>true</bool>
+      </property>
+      <widget class="QWidget" name="scrollAreaWidgetContents_2">
+       <property name="geometry">
+        <rect>
+         <x>0</x>
+         <y>0</y>
+         <width>335</width>
+         <height>491</height>
+        </rect>
+       </property>
+       <layout class="QGridLayout" name="gridLayout_3">
+        <item row="17" column="0">
+         <widget class="QSpinBox" name="r_off_3D"/>
+        </item>
+        <item row="18" column="0">
+         <widget class="QLabel" name="label_28">
+          <property name="text">
+           <string>Max. Radius:</string>
+          </property>
+         </widget>
+        </item>
+        <item row="10" column="0">
+         <widget class="QLabel" name="label_32">
+          <property name="text">
+           <string>File for saving pore labels:</string>
+          </property>
+         </widget>
+        </item>
+        <item row="12" column="0">
+         <widget class="QLabel" name="label_20">
+          <property name="text">
+           <string>File for saving particle labels:</string>
+          </property>
+         </widget>
+        </item>
+        <item row="7" column="0">
+         <widget class="QLabel" name="label_23">
+          <property name="text">
+           <string>File name for saving particle-size distribution:</string>
+          </property>
+         </widget>
+        </item>
+        <item row="14" column="0">
+         <widget class="QLabel" name="label_24">
+          <property name="text">
+           <string>Number of CPU Cores: </string>
+          </property>
+         </widget>
+        </item>
+        <item row="6" column="0">
+         <widget class="QLineEdit" name="poreSD_Out3D">
+          <property name="readOnly">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item row="13" column="0">
+         <widget class="QLineEdit" name="partLabel_Out3D">
+          <property name="readOnly">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item row="9" column="1">
+         <widget class="QLabel" name="label_27">
+          <property name="text">
+           <string>.csv</string>
+          </property>
+         </widget>
+        </item>
+        <item row="15" column="0">
+         <widget class="QSpinBox" name="nThreads3D">
+          <property name="minimum">
+           <number>1</number>
+          </property>
+          <property name="maximum">
+           <number>1280</number>
+          </property>
+         </widget>
+        </item>
+        <item row="5" column="0">
+         <widget class="QLabel" name="label_26">
+          <property name="text">
+           <string>File name for saving pore-size distribution:</string>
+          </property>
+         </widget>
+        </item>
+        <item row="11" column="1">
+         <widget class="QLabel" name="label_25">
+          <property name="text">
+           <string>.csv</string>
+          </property>
+         </widget>
+        </item>
+        <item row="3" column="0">
+         <widget class="QCheckBox" name="partSD_3D">
+          <property name="text">
+           <string>Particle-size distribution</string>
+          </property>
+         </widget>
+        </item>
+        <item row="4" column="0">
+         <widget class="QCheckBox" name="partLabel_3D">
+          <property name="text">
+           <string>Particle Labels</string>
+          </property>
+          <property name="checkable">
+           <bool>false</bool>
+          </property>
+         </widget>
+        </item>
+        <item row="19" column="0">
+         <widget class="QSpinBox" name="maxR_3D">
+          <property name="minimum">
+           <number>1</number>
+          </property>
+          <property name="maximum">
+           <number>100000</number>
+          </property>
+          <property name="value">
+           <number>100</number>
+          </property>
+         </widget>
+        </item>
+        <item row="13" column="1">
+         <widget class="QLabel" name="label_29">
+          <property name="text">
+           <string>.csv</string>
+          </property>
+         </widget>
+        </item>
+        <item row="2" column="0">
+         <widget class="QCheckBox" name="poreLabel_3D">
+          <property name="text">
+           <string>Pore Labels</string>
+          </property>
+          <property name="checkable">
+           <bool>false</bool>
+          </property>
+         </widget>
+        </item>
+        <item row="11" column="0">
+         <widget class="QLineEdit" name="poreLabel_Out3D">
+          <property name="readOnly">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item row="0" column="0" colspan="2">
+         <widget class="QLabel" name="label_19">
+          <property name="text">
+           <string>Select expected outputs:</string>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="0">
+         <widget class="QCheckBox" name="poreSD_3D">
+          <property name="text">
+           <string>Pore-size distribution</string>
+          </property>
+         </widget>
+        </item>
+        <item row="9" column="0">
+         <widget class="QLineEdit" name="partSD_Out3D">
+          <property name="readOnly">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item row="6" column="1">
+         <widget class="QLabel" name="label_21">
+          <property name="text">
+           <string>.csv</string>
+          </property>
+         </widget>
+        </item>
+        <item row="16" column="0">
+         <widget class="QLabel" name="label_22">
+          <property name="text">
+           <string>Radius Offset:</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </widget>
+     <widget class="QLabel" name="label_31">
+      <property name="geometry">
+       <rect>
+        <x>26</x>
+        <y>248</y>
+        <width>141</width>
+        <height>16</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>General Settings:</string>
+      </property>
+     </widget>
+    </widget>
+    <widget class="QWidget" name="runTab">
+     <attribute name="title">
+      <string>Run</string>
+     </attribute>
+     <widget class="QLineEdit" name="opFolder">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>30</y>
+        <width>261</width>
+        <height>22</height>
+       </rect>
+      </property>
+      <property name="readOnly">
+       <bool>true</bool>
+      </property>
+     </widget>
+     <widget class="QLabel" name="label_12">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>10</y>
+        <width>261</width>
+        <height>16</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Operating Folder (where input file is):</string>
+      </property>
+     </widget>
+     <widget class="QPushButton" name="searchFolder">
+      <property name="geometry">
+       <rect>
+        <x>280</x>
+        <y>30</y>
+        <width>41</width>
+        <height>21</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>...</string>
+      </property>
+     </widget>
+     <widget class="QPushButton" name="runButton">
+      <property name="geometry">
+       <rect>
+        <x>30</x>
+        <y>410</y>
+        <width>161</width>
+        <height>101</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>RUN</string>
+      </property>
+     </widget>
+     <widget class="QTextEdit" name="runtimeMessages">
+      <property name="geometry">
+       <rect>
+        <x>370</x>
+        <y>50</y>
+        <width>371</width>
+        <height>471</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QLabel" name="label_36">
+      <property name="geometry">
+       <rect>
+        <x>370</x>
+        <y>30</y>
+        <width>261</width>
+        <height>16</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Runtime Messages:</string>
+      </property>
+     </widget>
+    </widget>
+   </widget>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

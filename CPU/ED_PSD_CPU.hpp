@@ -180,7 +180,7 @@ int readInput(char *inputFilename, options *opts)
     opts->poreSD = false;
     opts->partSD = false;
     opts->partLabel = false;
-    opts->poreSD = false;
+    opts->poreLabel = false;
 
     opts->TH = 128;
     opts->maxR = 100;
@@ -375,7 +375,7 @@ int readStack(char *P,
 {
     long int index;
 
-    char imgName[100];
+    char imgName[1000];
 
     sizeInfo2D tempSize;
 
@@ -386,7 +386,7 @@ int readStack(char *P,
         unsigned char *target_img;
 
         // get image name
-        sprintf(imgName, "%0*ld.jpg", opts->LeadZero, sliceNum);
+        sprintf(imgName, "%0*d.jpg", opts->LeadZero, sliceNum);
 
         // read image
 
@@ -1201,11 +1201,6 @@ int partSD_2D(options *opts,
     {
         ParticleLabel2D(opts->radOff, lastR, R, L, info);
         saveLabels2D(R, L, info, opts->partLabel_Out);
-<<<<<<< Updated upstream
-
-=======
-        // Free R and L
->>>>>>> Stashed changes
         free(R);
         free(L);
     }
@@ -1398,11 +1393,6 @@ int poreSD_2D(options *opts,
     {
         ParticleLabel2D(opts->radOff, lastR, R, L, info);
         saveLabels2D(R, L, info, opts->poreLabel_Out);
-<<<<<<< Updated upstream
-
-=======
-        // Free R and L
->>>>>>> Stashed changes
         free(R);
         free(L);
     }
@@ -1603,10 +1593,6 @@ int partSD_3D(options *opts,
     {
         ParticleLabel3D(opts->radOff, lastR, R, L, info);
         saveLabels3D(R, L, info, opts->partLabel_Out);
-<<<<<<< Updated upstream
-=======
-        // Free R and L
->>>>>>> Stashed changes
         free(R);
         free(L);
     }
@@ -1806,10 +1792,6 @@ int poreSD_3D(options *opts,
         ParticleLabel3D(opts->radOff, lastR, R, L, info);
         saveLabels3D(R, L, info, opts->poreLabel_Out);
 
-<<<<<<< Updated upstream
-=======
-        // Free R and L
->>>>>>> Stashed changes
         free(R);
         free(L);
     }

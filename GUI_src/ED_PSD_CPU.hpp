@@ -1780,7 +1780,7 @@ int poreSD_3D(options *opts,
         // print verbose
 
         if (opts->verbose)
-            printf("R = %d, P = %ld, E = %ld, D = %ld\n", radius, p_sum, e_sum, d_sum);
+            qInfo("R = %d, P = %ld, E = %ld, D = %ld\n", radius, p_sum, e_sum, d_sum);
 
         // increment radius
         radius++;

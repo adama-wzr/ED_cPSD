@@ -1061,7 +1061,7 @@
      <widget class="QPushButton" name="runButton">
       <property name="geometry">
        <rect>
-        <x>110</x>
+        <x>220</x>
         <y>470</y>
         <width>101</width>
         <height>41</height>
@@ -1085,6 +1085,9 @@
         <height>471</height>
        </rect>
       </property>
+      <property name="readOnly">
+       <bool>true</bool>
+      </property>
      </widget>
      <widget class="QLabel" name="label_36">
       <property name="geometry">
@@ -1097,6 +1100,33 @@
       </property>
       <property name="text">
        <string>Runtime Messages:</string>
+      </property>
+     </widget>
+     <widget class="QPushButton" name="stopButton">
+      <property name="enabled">
+       <bool>false</bool>
+      </property>
+      <property name="geometry">
+       <rect>
+        <x>30</x>
+        <y>470</y>
+        <width>101</width>
+        <height>41</height>
+       </rect>
+      </property>
+      <property name="font">
+       <font>
+        <pointsize>12</pointsize>
+       </font>
+      </property>
+      <property name="text">
+       <string>Stop</string>
+      </property>
+      <property name="checkable">
+       <bool>false</bool>
+      </property>
+      <property name="flat">
+       <bool>false</bool>
       </property>
      </widget>
     </widget>

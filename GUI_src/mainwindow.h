@@ -4,6 +4,7 @@
 #include <QMainWindow>
 #include <QFile>
 #include <QFileDialog>
+#include <QtConcurrent>
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -33,8 +34,11 @@ private slots:
     // Run slots
     void runSim();
     void findOpFolder();
+    void handleFinish();
 private:
     Ui::MainWindow *ui;
+    QFutureWatcher<int> watcher;
+    QFuture<int> future;
 };
 
 #endif // MAINWINDOW_H

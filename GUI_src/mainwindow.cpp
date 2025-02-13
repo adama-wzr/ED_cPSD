@@ -27,6 +27,8 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->saveButton3D, &QPushButton::clicked, this, &MainWindow::saveInput3D);
     // Find operating folder
     connect(ui->searchFolder, &QPushButton::clicked, this, &MainWindow::findOpFolder);
+    // connect future watcher with future
+    connect(&watcher, &QFutureWatcher<int>::finished, this, &MainWindow::handleFinish);
     // Run code
     connect(ui->runButton, &QPushButton::clicked, this, &MainWindow::runSim);
 }
@@ -66,78 +68,63 @@ int simOpts(const QString &string)
 void MainWindow::runSim()
 {
 
+    ui->runtimeMessages->setText("Attempting to run simulation.\n");
+
     char* runtimeFolder = (char *)malloc(sizeof(char)*1000);
 
     if (ui->opFolder->text().isEmpty())
     {
-        ui->runtimeMessages->setText("Error: no operating folder selected!\n");
+        ui->runtimeMessages->append("Error: no operating folder selected!\n");
         free(runtimeFolder);
         return;
     }else
     {
         strcpy(runtimeFolder, ui->opFolder->text().toStdString().c_str());
-        ui->runtimeMessages->setText("Folder: " + ui->opFolder->text());
+        ui->runtimeMessages->append("Folder: " + ui->opFolder->text() + "/\n");
     }
 
-    QFuture<int> future = QtConcurrent::run(simOpts, ui->opFolder->text());
+    ui->runtimeMessages->append("Simulation running, please wait.\n");
 
-    qInfo() << "Working?";
-    // QFuture<int> future = QtConcurrent::run(runED, runtimeFolder);
-    // declare options struct
-    // options opts;
-    // opts.runtimeFolder = (char *)malloc(sizeof(char)*1000);
+    // disable buttons and text
 
-    // // tmp output string
-    // QString tmp = "";
-    // QString folder = "";
-    // // input file
+    ui->runButton->setEnabled(false);
+    ui->stopButton->setEnabled(true);
 
-    // char inputTextFile[100];
-    // sprintf(inputTextFile, "input.txt");
+    ui->searchFolder->setEnabled(false);
+    ui->opFolder->setReadOnly(true);
 
-    // // set operating folder
+    // QFutureWatcher<int> watcher;
+    // connect the watcher with handleFinish function
+    // connect(&watcher, &QFutureWatcher<int>::finished, this, &MainWindow::handleFinish);
 
-    // if (ui->opFolder->text().isEmpty())
-    // {
-    //     ui->runtimeMessages->setText("Error: no operating folder selected!\n");
-    //     return;
-    // }else
-    // {
-    //     folder = ui->opFolder->text();
-    //     ui->runtimeMessages->setText("Folder: " + folder);
-    // }
-
-    // strcpy(opts.runtimeFolder, ui->opFolder->text().toStdString().c_str());
-
-    // // Read user-entered options
-    // int flag = 0;
-    // flag = readInput(inputTextFile, &opts);
-    // if(flag == 1)
-    // {
-    //     tmp = "Failed to find input.txt on selected folder.\nExiting now.\n";
-    //     ui->runtimeMessages->append(tmp);
-    //     return;
-    // }else
-    // {
-    //     tmp = "Input read!\n";
-    //     ui->runtimeMessages->append(tmp);
-    // }
-    // tmp = "Running...\n";
-    // ui->runtimeMessages->append(tmp);
-
-    // if(opts.nD == 2)
-    // {
-    //     QFuture<int> future = QtConcurrent::run(Sim2D, &opts);
-    //     // Sim2D(&opts);
-    // }
-    // else if(opts.nD == 3)
-    // {
-    //     QFuture<int> future = QtConcurrent::run(Sim3D, &opts);
-    //     // Sim3D(&opts);
-    // }
-
+    // QFuture<int> future = QtConcurrent::run(simOpts, ui->opFolder->text());
+    future = QtConcurrent::run(simOpts, ui->opFolder->text());
+    // watch the concurrent execution
+    watcher.setFuture(future);
 
     free(runtimeFolder);
+    return;
+}
+
+void MainWindow::handleFinish()
+{
+    int setStatus = future.result();
+    ui->runButton->setEnabled(true);
+    ui->stopButton->setEnabled(false);
+
+    ui->searchFolder->setEnabled(true);
+    ui->opFolder->setReadOnly(false);
+
+    if (setStatus == 0)
+    {
+        ui->runtimeMessages->append("Execution Finished Successfully!");
+    }else
+    {
+        ui->runtimeMessages->append("Execution Finished with error.");
+        ui->runtimeMessages->append("Check command line output for more details.");
+    }
+
+
     return;
 }
 

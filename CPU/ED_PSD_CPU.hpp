@@ -776,7 +776,6 @@ void pMeijster3D_debug(bool *targetArray,
 #pragma omp for schedule(auto)
             for (int i = 0; i < height; i++)
             {
-                // pass56_3D(targetEDT, s, t, j, i, width, height, depth);
                 size_t offset = i * width + j;
                 pass34_Global(targetEDT + offset, tempEDT, depth, height * width, s, t);
             }
@@ -1090,8 +1089,8 @@ int partSD_2D(options *opts,
     memset(D, 0, sizeof(bool) * info->nElements);
     memset(B, 0, sizeof(bool) * info->nElements);
 
-    // If POI, bool = 1
-
+// If POI, bool = 1
+#pragma omp parallel for schedule(auto)
     for (int i = 0; i < info->nElements; i++)
     {
         if (P[i] == POI)
@@ -1109,7 +1108,7 @@ int partSD_2D(options *opts,
         // copy P into D (probably not necessary)
 
         memcpy(D, B, sizeof(bool) * info->nElements);
-
+#pragma omp parallel for schedule(auto)
         for (int i = 0; i < info->nElements; i++)
         {
             if (EDT_D[i] <= radius * radius)
@@ -1124,8 +1123,8 @@ int partSD_2D(options *opts,
 
         pMeijster2D(D, EDT_E, info, 1);
 
-        // Update E
-
+// Update E
+#pragma omp parallel for schedule(auto)
         for (int i = 0; i < info->nElements; i++)
         {
             if (EDT_E[i] <= radius * radius)
@@ -1185,7 +1184,7 @@ int partSD_2D(options *opts,
     fprintf(partSD_OUT, "r,p(r)\n");
     for (int i = 0; i < lastR; i++)
     {
-        fprintf(partSD_OUT, "%d,%lf\n", i, (double)partRemoved[i] / sum_removed);
+        fprintf(partSD_OUT, "%d,%lf\n", i + 1, (double)partRemoved[i] / sum_removed);
     }
 
     fclose(partSD_OUT);
@@ -1283,8 +1282,8 @@ int poreSD_2D(options *opts,
     memset(D, 0, sizeof(bool) * info->nElements);
     memset(B, 0, sizeof(bool) * info->nElements);
 
-    // If POI, bool = 1
-
+// If POI, bool = 1
+#pragma omp parallel for schedule(auto)
     for (int i = 0; i < info->nElements; i++)
     {
         if (P[i] == POI)
@@ -1302,7 +1301,7 @@ int poreSD_2D(options *opts,
         // copy P into D (probably not necessary)
 
         memcpy(D, B, sizeof(bool) * info->nElements);
-
+#pragma omp parallel for schedule(auto)
         for (int i = 0; i < info->nElements; i++)
         {
             if (EDT_D[i] <= radius * radius)
@@ -1317,8 +1316,8 @@ int poreSD_2D(options *opts,
 
         pMeijster2D(D, EDT_E, info, 1);
 
-        // Update E
-
+// Update E
+#pragma omp parallel for schedule(auto)
         for (int i = 0; i < info->nElements; i++)
         {
             if (EDT_E[i] <= radius * radius)
@@ -1377,7 +1376,7 @@ int poreSD_2D(options *opts,
     fprintf(poreSD_OUT, "r,p(r)\n");
     for (int i = 0; i < lastR; i++)
     {
-        fprintf(poreSD_OUT, "%d,%lf\n", i, (double)poreRemoved[i] / sum_removed);
+        fprintf(poreSD_OUT, "%d,%lf\n", i + 1, (double)poreRemoved[i] / sum_removed);
     }
 
     fclose(poreSD_OUT);
@@ -1475,8 +1474,8 @@ int partSD_3D(options *opts,
     memset(D, 0, sizeof(bool) * info->nElements);
     memset(B, 0, sizeof(bool) * info->nElements);
 
-    // If POI, bool = 1
-
+// If POI, bool = 1
+#pragma omp parallel for schedule(auto)
     for (int i = 0; i < info->nElements; i++)
     {
         if (P[i] == POI)
@@ -1496,7 +1495,7 @@ int partSD_3D(options *opts,
         // copy P into D (probably not necessary)
 
         memcpy(D, B, sizeof(bool) * info->nElements);
-
+#pragma omp parallel for schedule(auto)
         for (int i = 0; i < info->nElements; i++)
         {
             if (pow(EDT_D[i], 2) <= (float)radius * radius)
@@ -1511,8 +1510,8 @@ int partSD_3D(options *opts,
 
         pMeijster3D_debug(D, EDT_E, info, 1);
 
-        // Update E
-
+// Update E
+#pragma omp parallel for schedule(auto)
         for (int i = 0; i < info->nElements; i++)
         {
             if (pow(EDT_E[i], 2) <= (float)radius * radius)
@@ -1577,7 +1576,7 @@ int partSD_3D(options *opts,
     fprintf(partSD_OUT, "r,p(r)\n");
     for (int i = 0; i < lastR; i++)
     {
-        fprintf(partSD_OUT, "%d,%lf\n", i, (double)partRemoved[i] / sum_removed);
+        fprintf(partSD_OUT, "%d,%lf\n", i + 1, (double)partRemoved[i] / sum_removed);
     }
 
     fclose(partSD_OUT);
@@ -1675,8 +1674,8 @@ int poreSD_3D(options *opts,
     memset(D, 0, sizeof(bool) * info->nElements);
     memset(B, 0, sizeof(bool) * info->nElements);
 
-    // If POI, bool = 1
-
+// If POI, bool = 1
+#pragma omp parallel for schedule(auto)
     for (int i = 0; i < info->nElements; i++)
     {
         if (P[i] == POI)
@@ -1696,7 +1695,7 @@ int poreSD_3D(options *opts,
         // copy B into D (probably not necessary)
 
         memcpy(D, B, sizeof(bool) * info->nElements);
-
+#pragma omp parallel for schedule(auto)
         for (int i = 0; i < info->nElements; i++)
         {
             if (pow(EDT_D[i], 2) <= (float)radius * radius)
@@ -1711,8 +1710,8 @@ int poreSD_3D(options *opts,
 
         pMeijster3D_debug(D, EDT_E, info, 1);
 
-        // Update E
-
+// Update E
+#pragma omp parallel for schedule(auto)
         for (int i = 0; i < info->nElements; i++)
         {
             if (pow(EDT_E[i], 2) <= (float)radius * radius)

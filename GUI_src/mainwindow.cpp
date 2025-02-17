@@ -29,6 +29,10 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->searchFolder, &QPushButton::clicked, this, &MainWindow::findOpFolder);
     // connect future watcher with future
     connect(&watcher, &QFutureWatcher<int>::finished, this, &MainWindow::handleFinish);
+    // connect clear button 2D
+    connect(ui->clearButton2D, &QPushButton::clicked, this, &MainWindow::clearText2D);
+    // connect clear button 3D
+    connect(ui->clearButton3D, &QPushButton::clicked, this, &MainWindow::clearText3D);
     // Run code
     connect(ui->runButton, &QPushButton::clicked, this, &MainWindow::runSim);
 }
@@ -42,6 +46,26 @@ int simOpts(const QString &string)
 
     char inputTextFile[100];
     sprintf(inputTextFile, "input.txt");
+
+    bool fileFlag = false;
+
+    std::filesystem::path dir (opts.folderName);
+    std::filesystem::path file (inputTextFile);
+    std::filesystem::path full_path = dir / file;
+
+    if(FILE *file = fopen(full_path.generic_string().c_str(), "r")){
+        fclose(file);
+        fileFlag = true;
+    }else
+    {
+        fileFlag = false;
+    }
+
+    if (!fileFlag)
+    {
+        qInfo("Could not find input file. Exiting now.");
+        return 1;
+    }
 
     readInput(inputTextFile, &opts);
 
@@ -150,6 +174,12 @@ void MainWindow::saveInput2D()
     return;
 }
 
+void MainWindow::clearText2D()
+{
+    ui->textDisplay2D->clear();
+    return;
+}
+
 // save input file 3D
 
 void MainWindow::saveInput3D()
@@ -160,6 +190,12 @@ void MainWindow::saveInput3D()
         myFile.write(ui->textDisplay3D->toPlainText().toStdString().c_str());
     }
     myFile.close();
+    return;
+}
+
+void MainWindow::clearText3D()
+{
+    ui->textDisplay3D->clear();
     return;
 }
 

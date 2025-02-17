@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>DE-cPSD</string>
+   <string>ED-cPSD</string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <widget class="QTabWidget" name="tabWidget">
@@ -24,7 +24,7 @@
      </rect>
     </property>
     <property name="currentIndex">
-     <number>2</number>
+     <number>1</number>
     </property>
     <widget class="QWidget" name="tab">
      <attribute name="title">
@@ -56,7 +56,7 @@
      <widget class="QPushButton" name="GenButton2D">
       <property name="geometry">
        <rect>
-        <x>360</x>
+        <x>340</x>
         <y>470</y>
         <width>131</width>
         <height>31</height>
@@ -82,7 +82,7 @@
      <widget class="QPushButton" name="saveButton2D">
       <property name="geometry">
        <rect>
-        <x>590</x>
+        <x>610</x>
         <y>470</y>
         <width>131</width>
         <height>31</height>
@@ -364,9 +364,9 @@
      <widget class="QCheckBox" name="batchMode2D">
       <property name="geometry">
        <rect>
-        <x>250</x>
-        <y>456</y>
-        <width>81</width>
+        <x>240</x>
+        <y>500</y>
+        <width>91</width>
         <height>20</height>
        </rect>
       </property>
@@ -377,8 +377,8 @@
      <widget class="QCheckBox" name="verbose2D">
       <property name="geometry">
        <rect>
-        <x>250</x>
-        <y>420</y>
+        <x>240</x>
+        <y>470</y>
         <width>81</width>
         <height>20</height>
        </rect>
@@ -480,6 +480,19 @@
        <number>100</number>
       </property>
      </widget>
+     <widget class="QPushButton" name="clearButton2D">
+      <property name="geometry">
+       <rect>
+        <x>493</x>
+        <y>470</y>
+        <width>91</width>
+        <height>31</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Clear</string>
+      </property>
+     </widget>
     </widget>
     <widget class="QWidget" name="tab_2">
      <attribute name="title">
@@ -514,7 +527,7 @@
      <widget class="QPushButton" name="GenButton3D">
       <property name="geometry">
        <rect>
-        <x>390</x>
+        <x>380</x>
         <y>470</y>
         <width>131</width>
         <height>31</height>
@@ -1012,6 +1025,19 @@
       </property>
       <property name="text">
        <string>General Settings:</string>
+      </property>
+     </widget>
+     <widget class="QPushButton" name="clearButton3D">
+      <property name="geometry">
+       <rect>
+        <x>520</x>
+        <y>470</y>
+        <width>91</width>
+        <height>31</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Clear</string>
       </property>
      </widget>
     </widget>

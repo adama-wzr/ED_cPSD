@@ -25,12 +25,14 @@ private slots:
     void togglePartLabel2D();
     void togglePoreLabel2D();
     void saveInput2D();
+    void clearText2D();
     // 3D slots
     void updateFileText3D();
     void toggleInput3D();
     void togglePartLabel3D();
     void togglePoreLabel3D();
     void saveInput3D();
+    void clearText3D();
     // Run slots
     void runSim();
     void findOpFolder();

@@ -1208,12 +1208,18 @@ int partSD_2D(options *opts,
         sum_removed += (int)partRemoved[i];
     }
 
-    FILE *partSD_OUT = fopen(opts->partSD_Out, "w+");
+    std::filesystem::path dir (opts->folderName);
+    std::filesystem::path file (opts->partSD_Out);
+    std::filesystem::path full_path = dir / file;
+
+
+
+    FILE *partSD_OUT = fopen(full_path.generic_string().c_str(), "w+");
 
     fprintf(partSD_OUT, "r,p(r)\n");
     for (int i = 0; i < lastR; i++)
     {
-        fprintf(partSD_OUT, "%d,%lf\n", i, (double)partRemoved[i] / sum_removed);
+        fprintf(partSD_OUT, "%d,%lf\n", i + 1, (double)partRemoved[i] / sum_removed);
     }
 
     fclose(partSD_OUT);
@@ -1400,12 +1406,16 @@ int poreSD_2D(options *opts,
         sum_removed += (int)poreRemoved[i];
     }
 
-    FILE *poreSD_OUT = fopen(opts->poreSD_Out, "w+");
+    std::filesystem::path dir (opts->folderName);
+    std::filesystem::path file (opts->poreSD_Out);
+    std::filesystem::path full_path = dir / file;
+
+    FILE *poreSD_OUT = fopen(full_path.generic_string().c_str(), "w+");
 
     fprintf(poreSD_OUT, "r,p(r)\n");
     for (int i = 0; i < lastR; i++)
     {
-        fprintf(poreSD_OUT, "%d,%lf\n", i, (double)poreRemoved[i] / sum_removed);
+        fprintf(poreSD_OUT, "%d,%lf\n", i + 1, (double)poreRemoved[i] / sum_removed);
     }
 
     fclose(poreSD_OUT);
@@ -1611,7 +1621,7 @@ int partSD_3D(options *opts,
     fprintf(partSD_OUT, "r,p(r)\n");
     for (int i = 0; i < lastR; i++)
     {
-        fprintf(partSD_OUT, "%d,%lf\n", i, (double)partRemoved[i] / sum_removed);
+        fprintf(partSD_OUT, "%d,%lf\n", i + 1, (double)partRemoved[i] / sum_removed);
     }
 
     fclose(partSD_OUT);
@@ -1894,13 +1904,20 @@ int Sim2D(options *opts)
 
     // Cast image into P, free original array
 
+    size_t sCount = 0;
+
     for (int i = 0; i < imgInfo.nElements; i++)
     {
         if (target_img[i] < opts->TH)
             P[i] = 0;
         else
+        {
+            sCount++;
             P[i] = 1;
+        }
     }
+
+    qInfo("SVF = %1.3e\n", (float)sCount/(float)(imgInfo.nElements));
 
     free(target_img);
 

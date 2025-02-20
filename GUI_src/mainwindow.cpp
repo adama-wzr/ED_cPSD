@@ -9,6 +9,17 @@ MainWindow::MainWindow(QWidget *parent)
     , ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
+    // worker thread
+    Worker *worker = new Worker;
+    // move to new thread
+    worker->moveToThread(&workerThread);
+    // connect worker slots and signals
+    connect(&workerThread, &QThread::finished, worker, &QObject::deleteLater);
+    connect(ui->runButton, &QPushButton::clicked, worker, &Worker::runSim);
+    connect(ui->stopButton, &QPushButton::clicked, worker, &Worker::stopSim);
+    connect(worker, &Worker::resultReady, this, &MainWindow::handleResult);
+    // start worker Thread
+    workerThread.start();
     // gen button
     connect(ui->GenButton2D,&QPushButton::clicked, this, &MainWindow::updateFileText);
     // gen button 3D
@@ -27,15 +38,40 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->saveButton3D, &QPushButton::clicked, this, &MainWindow::saveInput3D);
     // Find operating folder
     connect(ui->searchFolder, &QPushButton::clicked, this, &MainWindow::findOpFolder);
-    // connect future watcher with future
-    connect(&watcher, &QFutureWatcher<int>::finished, this, &MainWindow::handleFinish);
     // connect clear button 2D
     connect(ui->clearButton2D, &QPushButton::clicked, this, &MainWindow::clearText2D);
     // connect clear button 3D
     connect(ui->clearButton3D, &QPushButton::clicked, this, &MainWindow::clearText3D);
+    // connect clear button Runtime
+    connect(ui->clearRunButton, &QPushButton::clicked, this, &MainWindow::clearTextRun);
     // Run code
-    connect(ui->runButton, &QPushButton::clicked, this, &MainWindow::runSim);
+    // connect(ui->runButton, &QPushButton::clicked, this, &MainWindow::runSim);
 }
+
+// print results
+void MainWindow::handleResult(const QString &result)
+{
+    // qInfo() << result;
+    ui->runtimeMessages->append(result);
+    return;
+}
+
+// Worker run sim
+
+void Worker::runSim()
+{
+    QString result = "Hello";
+    emit resultReady(result);
+    return;
+}
+
+void Worker::stopSim()
+{
+    qInfo()<< "Sim Stopped!";
+    return;
+}
+
+
 
 int simOpts(const QString &string)
 {
@@ -92,61 +128,61 @@ int simOpts(const QString &string)
 void MainWindow::runSim()
 {
 
-    ui->runtimeMessages->setText("Attempting to run simulation.\n");
+    // ui->runtimeMessages->setText("Attempting to run simulation.\n");
 
-    char* runtimeFolder = (char *)malloc(sizeof(char)*1000);
+    // char* runtimeFolder = (char *)malloc(sizeof(char)*1000);
 
-    if (ui->opFolder->text().isEmpty())
-    {
-        ui->runtimeMessages->append("Error: no operating folder selected!\n");
-        free(runtimeFolder);
-        return;
-    }else
-    {
-        strcpy(runtimeFolder, ui->opFolder->text().toStdString().c_str());
-        ui->runtimeMessages->append("Folder: " + ui->opFolder->text() + "/\n");
-    }
+    // if (ui->opFolder->text().isEmpty())
+    // {
+    //     ui->runtimeMessages->append("Error: no operating folder selected!\n");
+    //     free(runtimeFolder);
+    //     return;
+    // }else
+    // {
+    //     strcpy(runtimeFolder, ui->opFolder->text().toStdString().c_str());
+    //     ui->runtimeMessages->append("Folder: " + ui->opFolder->text() + "/\n");
+    // }
 
-    ui->runtimeMessages->append("Simulation running, please wait.\n");
+    // ui->runtimeMessages->append("Simulation running, please wait.\n");
 
-    // disable buttons and text
+    // // disable buttons and text
 
-    ui->runButton->setEnabled(false);
-    ui->stopButton->setEnabled(true);
+    // ui->runButton->setEnabled(false);
+    // ui->stopButton->setEnabled(true);
 
-    ui->searchFolder->setEnabled(false);
-    ui->opFolder->setReadOnly(true);
+    // ui->searchFolder->setEnabled(false);
+    // ui->opFolder->setReadOnly(true);
 
-    // QFutureWatcher<int> watcher;
-    // connect the watcher with handleFinish function
-    // connect(&watcher, &QFutureWatcher<int>::finished, this, &MainWindow::handleFinish);
+    // // QFutureWatcher<int> watcher;
+    // // connect the watcher with handleFinish function
+    // // connect(&watcher, &QFutureWatcher<int>::finished, this, &MainWindow::handleFinish);
 
-    // QFuture<int> future = QtConcurrent::run(simOpts, ui->opFolder->text());
-    future = QtConcurrent::run(simOpts, ui->opFolder->text());
-    // watch the concurrent execution
-    watcher.setFuture(future);
+    // // QFuture<int> future = QtConcurrent::run(simOpts, ui->opFolder->text());
+    // future = QtConcurrent::run(simOpts, ui->opFolder->text());
+    // // watch the concurrent execution
+    // watcher.setFuture(future);
 
-    free(runtimeFolder);
+    // free(runtimeFolder);
     return;
 }
 
 void MainWindow::handleFinish()
 {
-    int setStatus = future.result();
-    ui->runButton->setEnabled(true);
-    ui->stopButton->setEnabled(false);
+    // int setStatus = future.result();
+    // ui->runButton->setEnabled(true);
+    // ui->stopButton->setEnabled(false);
 
-    ui->searchFolder->setEnabled(true);
-    ui->opFolder->setReadOnly(false);
+    // ui->searchFolder->setEnabled(true);
+    // ui->opFolder->setReadOnly(false);
 
-    if (setStatus == 0)
-    {
-        ui->runtimeMessages->append("Execution Finished Successfully!");
-    }else
-    {
-        ui->runtimeMessages->append("Execution Finished with error.");
-        ui->runtimeMessages->append("Check command line output for more details.");
-    }
+    // if (setStatus == 0)
+    // {
+    //     ui->runtimeMessages->append("Execution Finished Successfully!");
+    // }else
+    // {
+    //     ui->runtimeMessages->append("Execution Finished with error.");
+    //     ui->runtimeMessages->append("Check command line output for more details.");
+    // }
 
 
     return;
@@ -196,6 +232,12 @@ void MainWindow::saveInput3D()
 void MainWindow::clearText3D()
 {
     ui->textDisplay3D->clear();
+    return;
+}
+
+void MainWindow::clearTextRun()
+{
+    ui->runtimeMessages->clear();
     return;
 }
 
@@ -550,6 +592,8 @@ void MainWindow::updateFileText()
 
 MainWindow::~MainWindow()
 {
+    workerThread.quit();
+    workerThread.wait();
     delete ui;
 }
 

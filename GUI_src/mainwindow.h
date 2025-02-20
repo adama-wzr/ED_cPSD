@@ -5,6 +5,7 @@
 #include <QFile>
 #include <QFileDialog>
 #include <QtConcurrent>
+#include <QThread>
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -12,10 +13,22 @@ class MainWindow;
 }
 QT_END_NAMESPACE
 
+class Worker : public QObject
+{
+    Q_OBJECT
+public slots:
+    // simulation related slots
+    void runSim();
+    void stopSim();
+signals:
+    // simulation related signals
+    void resultReady(const QString &result);
+};
+
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
-
+    QThread workerThread;
 public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
@@ -34,13 +47,14 @@ private slots:
     void saveInput3D();
     void clearText3D();
     // Run slots
+    void clearTextRun();
     void runSim();
     void findOpFolder();
     void handleFinish();
+public slots:
+    void handleResult(const QString &);
 private:
     Ui::MainWindow *ui;
-    QFutureWatcher<int> watcher;
-    QFuture<int> future;
 };
 
 #endif // MAINWINDOW_H

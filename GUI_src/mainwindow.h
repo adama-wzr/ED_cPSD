@@ -6,7 +6,7 @@
 #include <QFileDialog>
 #include <QThread>
 #include <QMutex>
- #include <QWaitCondition>
+#include <QWaitCondition>
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -43,7 +43,7 @@ class MainWindow : public QMainWindow
     Q_OBJECT
 public:
     MainWindow(QWidget *parent = nullptr);
-    ~MainWindow();
+    // ~MainWindow();
 private slots:
     // 2D slots
     void updateFileText();

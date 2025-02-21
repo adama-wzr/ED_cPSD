@@ -55,11 +55,50 @@ void Worker::run()
         mutex.lock();
         strcpy(opts.folderName, foldername.toStdString().c_str());
         mutex.unlock();
+
         // now we can start the actual code run
         QString started = "Operating Folder:";
         emit resultReady(&started);
         QString test = QString(opts.folderName);
         emit resultReady(&test);
+        QString test2 = QString().asprintf("%1.3e", 1232845.4);
+        emit resultReady(&test2);
+
+        // first step is to parse informations
+
+        char inputTextFile[100];
+        sprintf(inputTextFile, "input.txt");
+
+        bool fileFlag = false;
+
+        std::filesystem::path dir (opts.folderName);
+        std::filesystem::path file (inputTextFile);
+        std::filesystem::path full_path = dir / file;
+
+        if(FILE *file = fopen(full_path.generic_string().c_str(), "r")){
+            fclose(file);
+            fileFlag = true;
+        }else
+            fileFlag = false;
+
+        if (!fileFlag)
+        {
+            QString fileError = "Could not locate input file, exiting now.";
+            emit resultReady(&fileError);
+        }
+        else
+        {
+            readInput(inputTextFile, &opts);
+            // attempt to run simulation
+            if (opts.verbose)
+                printOpts(&opts);
+        }
+
+        if(abort)
+            return;
+
+
+
 
         // work ended
         mutex.lock();
@@ -153,10 +192,10 @@ int simOpts(const QString &string)
 
     readInput(inputTextFile, &opts);
 
-    if(opts.verbose)
-    {
-        printOpts(&opts);
-    }
+    // if(opts.verbose)
+    // {
+    //     // printOpts(&opts);
+    // }
 
     if(opts.nD == 2)
     {
@@ -664,11 +703,9 @@ void MainWindow::updateFileText()
     return;
 }
 
-MainWindow::~MainWindow()
-{
-    workerThread.quit();
-    workerThread.wait();
-    delete ui;
-}
+// MainWindow::~MainWindow()
+// {
+//     delete ui;
+// }
 
 

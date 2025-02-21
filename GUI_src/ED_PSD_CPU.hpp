@@ -11,7 +11,7 @@
 #include <filesystem>
 
 #include <QDebug>
-
+#include "mainwindow.h"
 // Load stb for reading jpg's
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -84,7 +84,6 @@ void printOpts(options *opts)
 
         Function will print user options to the command line.
     */
-
     qInfo("--------------------------------------\n\n");
     qInfo("c-PSD Simulation\n");
     qInfo("Current selected options:\n\n");
@@ -295,7 +294,6 @@ int readInput(char *inputFilename, options *opts)
             opts->stackSize = (int)tempD;
         }
     }
-    qInfo() << "It appears we read the file properly?";
     return 0;
 }
 

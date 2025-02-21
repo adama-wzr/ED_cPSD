@@ -4,8 +4,9 @@
 #include <QMainWindow>
 #include <QFile>
 #include <QFileDialog>
-#include <QtConcurrent>
 #include <QThread>
+#include <QMutex>
+ #include <QWaitCondition>
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -13,22 +14,33 @@ class MainWindow;
 }
 QT_END_NAMESPACE
 
-class Worker : public QObject
+// worker thread class definition
+class Worker : public QThread
 {
     Q_OBJECT
-public slots:
-    // simulation related slots
-    void runSim();
-    void stopSim();
+public:
+    // constructor and destructor
+    Worker(QObject *parent = nullptr);
+    ~Worker();
+    // function call to run
+    void runSim(const QString string);
 signals:
-    // simulation related signals
-    void resultReady(const QString &result);
+    void resultReady(const QString *result);
+protected:
+    void run() override;
+private:
+    QMutex mutex;
+    QWaitCondition condition;
+    bool restart = false;
+    bool abort = false;
+    QString foldername;
 };
+
+// main window class definition
 
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
-    QThread workerThread;
 public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
@@ -51,10 +63,15 @@ private slots:
     void runSim();
     void findOpFolder();
     void handleFinish();
-public slots:
-    void handleResult(const QString &);
+    void disableButtons();
+    void enableButtons();  
 private:
+    void handleResult(const QString *string);
     Ui::MainWindow *ui;
+    Worker workerThread;
+    bool restart;
+    bool abort;
+    QString foldername;
 };
 
 #endif // MAINWINDOW_H

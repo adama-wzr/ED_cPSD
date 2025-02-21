@@ -1,25 +1,86 @@
 #include "mainwindow.h"
 #include "./ui_mainwindow.h"
 #include <QThread>
-#include <QtConcurrent>
 #include "ED_PSD_CPU.hpp"
+
+/*
+
+Worker Thread Class Implementation
+
+*/
+
+// constructor
+
+Worker::Worker(QObject *parent)
+    : QThread(parent)
+{
+}
+
+// destructor
+
+Worker::~Worker()
+{
+    mutex.lock();
+    abort = true;
+    condition.wakeOne();
+    mutex.unlock();
+    wait();
+}
+
+// runSim function
+
+void Worker::runSim(const QString string)
+{
+    QMutexLocker locker(&mutex);
+    this->foldername = string;
+    if(!isRunning())
+        start(LowPriority);
+    else
+    {
+        restart = true;
+        condition.wakeOne();
+    }
+    return;
+}
+
+// Re-implement run(), which is actually the function that does all of the work
+
+void Worker::run()
+{
+    QElapsedTimer timer;
+    forever
+    {
+        options opts;
+        opts.folderName = (char *)malloc(sizeof(char)*1000);
+        mutex.lock();
+        strcpy(opts.folderName, foldername.toStdString().c_str());
+        mutex.unlock();
+        // now we can start the actual code run
+        QString started = "Operating Folder:";
+        emit resultReady(&started);
+        QString test = QString(opts.folderName);
+        emit resultReady(&test);
+
+        // work ended
+        mutex.lock();
+        if(!restart)
+            condition.wait(&mutex);
+        restart = false;
+        mutex.unlock();
+    }
+}
+
+/*
+
+Main Window Class Implementation
+
+*/
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
-    // worker thread
-    Worker *worker = new Worker;
-    // move to new thread
-    worker->moveToThread(&workerThread);
-    // connect worker slots and signals
-    connect(&workerThread, &QThread::finished, worker, &QObject::deleteLater);
-    connect(ui->runButton, &QPushButton::clicked, worker, &Worker::runSim);
-    connect(ui->stopButton, &QPushButton::clicked, worker, &Worker::stopSim);
-    connect(worker, &Worker::resultReady, this, &MainWindow::handleResult);
-    // start worker Thread
-    workerThread.start();
     // gen button
     connect(ui->GenButton2D,&QPushButton::clicked, this, &MainWindow::updateFileText);
     // gen button 3D
@@ -42,35 +103,22 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->clearButton2D, &QPushButton::clicked, this, &MainWindow::clearText2D);
     // connect clear button 3D
     connect(ui->clearButton3D, &QPushButton::clicked, this, &MainWindow::clearText3D);
+    // connect run button to run function
+    connect(ui->runButton, &QPushButton::clicked, this, &MainWindow::runSim);
     // connect clear button Runtime
     connect(ui->clearRunButton, &QPushButton::clicked, this, &MainWindow::clearTextRun);
-    // Run code
-    // connect(ui->runButton, &QPushButton::clicked, this, &MainWindow::runSim);
+    // result ready queued connection
+    connect(&workerThread, &Worker::resultReady, this, &MainWindow::handleResult);
 }
+
 
 // print results
-void MainWindow::handleResult(const QString &result)
+void MainWindow::handleResult(const QString *result)
 {
     // qInfo() << result;
-    ui->runtimeMessages->append(result);
+    ui->runtimeMessages->append(*result);
     return;
 }
-
-// Worker run sim
-
-void Worker::runSim()
-{
-    QString result = "Hello";
-    emit resultReady(result);
-    return;
-}
-
-void Worker::stopSim()
-{
-    qInfo()<< "Sim Stopped!";
-    return;
-}
-
 
 
 int simOpts(const QString &string)
@@ -123,11 +171,37 @@ int simOpts(const QString &string)
     return 0;
 }
 
+void MainWindow::disableButtons()
+{
+    // // disable buttons and text
+    ui->runButton->setEnabled(false);
+    ui->stopButton->setEnabled(true);
+
+    ui->searchFolder->setEnabled(false);
+    ui->opFolder->setReadOnly(true);
+    return;
+}
+
+void MainWindow::enableButtons()
+{
+    ui->runButton->setEnabled(true);
+    ui->stopButton->setEnabled(false);
+
+    ui->searchFolder->setEnabled(true);
+    ui->opFolder->setReadOnly(false);
+    return;
+}
+
 // Run sim
 
 void MainWindow::runSim()
 {
-
+    if (ui->opFolder->text().isEmpty())
+    {
+        ui->runtimeMessages->append("Error: no operating folder selected!\n");
+        return;
+    }
+    workerThread.runSim(ui->opFolder->text());
     // ui->runtimeMessages->setText("Attempting to run simulation.\n");
 
     // char* runtimeFolder = (char *)malloc(sizeof(char)*1000);

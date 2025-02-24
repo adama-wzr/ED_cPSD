@@ -5,14 +5,15 @@
     This version is just a main file, will call functions from helper files.
 
     Last Update:
-    02/07/2025
+    02/24/2025
 
     Andre Adam.
 */
 
 #include "ED_PSD_CPU.hpp"
 
-int main(void){
+int main(void)
+{
 
     // struct to hold user input
 
@@ -32,11 +33,11 @@ int main(void){
     if (opts.verbose)
         printOpts(&opts);
 
-    if(opts.nD == 2)
+    if (opts.nD == 2)
         Sim2D(&opts);
-    
-    if(opts.nD == 3)
+
+    if (opts.nD == 3)
         Sim3D(&opts);
-    
+
     return 0;
 }

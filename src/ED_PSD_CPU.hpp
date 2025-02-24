@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <time.h>
 #include <string.h>
+#include <string>
+#include <fstream>
 #include <stdbool.h>
 #include <omp.h>
 #include <list>
@@ -13,40 +15,292 @@
 #include "stb_image.h"
 
 /*--------------------------------------------------------
-    
-                     Constants
 
- --------------------------------------------------------*/
-
-#define MAX_R 65
-
-/*--------------------------------------------------------
-    
                     Data structures
 
  --------------------------------------------------------*/
 
 typedef struct
 {
-    int width;
-    int height;
-    int depth;
-    long int nElements;
+    int nD;              // number of dimensions
+    char *inputFilename; // name of input structure
+    char *poreSD_Out;    // name of pore size distribution output
+    char *partSD_Out;    // name of particle size distribution output
+    char *poreLabel_Out; // name of pore labels output file
+    char *partLabel_Out; // name of particle labels output file
+    char *readFolder;    // folder name
+    char *saveFolder;    // name of save folder
+    bool poreSD;         // flag for calculating pore size distribution
+    bool partSD;         // flag for calculating particle size distribution
+    bool poreLabel;      // flag for calculating pore labels
+    bool partLabel;      // flag for calculating particle labels
+    bool verbose;        // flag for printing to command line
+    int nThreads;        // number of CPU threads to use
+    int height;          // domain height in number of pixels
+    int width;           // domain width in number of pixels
+    int depth;           // domain depth in number of pixels
+    char inputType;      // type of input expected
+    unsigned char TH;    // threshold for grayscale images
+    int maxR;            // max scan radius
+    int radOff;          // radius offset
+    int stackSize;       // stack size
+    char LeadZero;       // number of leading zeroes
+} options;
+
+typedef struct
+{
+    int width;          // width of the domain in pixels
+    int height;         // height of the domain in pixels
+    int depth;          // depth of the domain in pixels
+    long int nElements; // total number of elements in pixels
 } sizeInfo;
 
 typedef struct
 {
-    int width;
-    int height;
-    long int nElements;
+    int width;          // width of the domain in pixels
+    int height;         // height of the domain in pixels
+    long int nElements; // total number of elements in pixels
 } sizeInfo2D;
 
+/*
 
-int readCSV(char*           target_name, 
-            char*           P, 
-            sizeInfo*       structureInfo,
-            bool            debugFlag)
+    Functions for reading and printing user input:
+
+*/
+
+void printOpts(options *opts)
 {
+    /*
+        Function printOpts:
+        Inputs:
+            - pointer to opts struct
+        Output:
+            - None
+
+        Function will print user options to the command line.
+    */
+
+    printf("--------------------------------------\n\n");
+    printf("c-PSD Simulation\n");
+    printf("Current selected options:\n\n");
+    printf("--------------------------------------\n");
+    printf("Number of Dimensions: %d\n", opts->nD);
+    printf("InputType = %d\n", opts->inputType);
+
+    // separate dimensions
+    if (opts->nD == 2)
+    {
+        if (opts->inputType == 0)
+        {
+            printf("Input Name: %s\n", opts->inputFilename);
+            printf("Phase Threshold: %d\n", (int)opts->TH);
+        }
+    }
+    else if (opts->nD == 3)
+    {
+        if (opts->inputType == 0)
+        {
+            printf("Input Name: %s\n", opts->inputFilename);
+            printf("Width  = %d\n", opts->width);
+            printf("Height = %d\n", opts->height);
+            printf("Depth  = %d\n", opts->depth);
+        }
+        else if (opts->inputType == 1)
+        {
+            printf("Stack Mode selected\n");
+            printf("Stack size = %d\n", opts->stackSize);
+            printf("Stack Threshold = %d\n", opts->TH);
+            printf("Leading Zeroes: %d\n", (int)opts->LeadZero);
+        }
+        else
+        {
+            printf("Option not yet implemented. Exiting with error status.\n");
+            return;
+        }
+    }
+
+    // options related to simulation type
+    if (opts->poreSD)
+    {
+        printf("Pore Size Distribution Output: %s\n", opts->poreSD_Out);
+    }
+    if (opts->poreLabel)
+    {
+        printf("Pore Label Output: %s\n", opts->poreLabel_Out);
+    }
+    if (opts->partSD)
+    {
+        printf("Partciel Size Distribution Output: %s\n", opts->partSD_Out);
+    }
+    if (opts->partLabel)
+    {
+        printf("Particle Label Output: %s\n", opts->partLabel_Out);
+    }
+
+    // nThreads
+
+    printf("Num. threads: %d\n", opts->nThreads);
+    printf("Max. Scan Radius: %d\n", opts->maxR);
+
+    printf("--------------------------------------\n\n");
+
+    return;
+}
+
+int readInput(char *inputFilename, options *opts)
+{
+    /*
+        Function readInput:
+        Inputs:
+            - pointer to array holding the input file name
+            - pointer to optins struct
+        Outputs:
+            - none
+
+        Function will read the user entered information from the input file and
+        populate the opts array with the relevant information.
+    */
+    // open file and start reading
+    std::string myText;
+
+    char tempC[1000];
+    double tempD;
+    char tempFilenames[1000];
+
+    std::ifstream InputFile(inputFilename);
+
+    // defaults
+
+    opts->nThreads = 1;
+    opts->verbose = true;
+    opts->inputType = 0;
+
+    opts->poreSD = false;
+    opts->partSD = false;
+    opts->partLabel = false;
+    opts->poreLabel = false;
+
+    opts->TH = 128;
+    opts->maxR = 100;
+    opts->radOff = 0;
+
+    opts->stackSize = 1;
+    opts->LeadZero = 5;
+
+    /*
+    --------------------------------------------------------------------------------
+
+    If anybody has a better idea of how to parse inputs please let me know.
+    Eventually I'm hoping the GUI will replace a lot of this code.
+
+    --------------------------------------------------------------------------------
+    */
+
+    while (std::getline(InputFile, myText))
+    {
+        sscanf(myText.c_str(), "%s %lf", tempC, &tempD);
+        if (strcmp(tempC, "nD:") == 0)
+        {
+            opts->nD = (int)tempD;
+        }
+        else if (strcmp(tempC, "inputFilename:") == 0)
+        {
+            sscanf(myText.c_str(), "%s %s", tempC, tempFilenames);
+            opts->inputFilename = (char *)malloc(1000 * sizeof(char));
+            strcpy(opts->inputFilename, tempFilenames);
+        }
+        else if (strcmp(tempC, "poreOut:") == 0)
+        {
+            opts->poreSD = true;
+            sscanf(myText.c_str(), "%s %s", tempC, tempFilenames);
+            opts->poreSD_Out = (char *)malloc(1000 * sizeof(char));
+            strcpy(opts->poreSD_Out, tempFilenames);
+        }
+        else if (strcmp(tempC, "partOut:") == 0)
+        {
+            opts->partSD = true;
+            sscanf(myText.c_str(), "%s %s", tempC, tempFilenames);
+            opts->partSD_Out = (char *)malloc(1000 * sizeof(char));
+            strcpy(opts->partSD_Out, tempFilenames);
+        }
+        else if (strcmp(tempC, "poreLabelOut:") == 0)
+        {
+            opts->poreLabel = true;
+            sscanf(myText.c_str(), "%s %s", tempC, tempFilenames);
+            opts->poreLabel_Out = (char *)malloc(1000 * sizeof(char));
+            strcpy(opts->poreLabel_Out, tempFilenames);
+        }
+        else if (strcmp(tempC, "partLabelOut:") == 0)
+        {
+            opts->partLabel = true;
+            sscanf(myText.c_str(), "%s %s", tempC, tempFilenames);
+            opts->partLabel_Out = (char *)malloc(1000 * sizeof(char));
+            strcpy(opts->partLabel_Out, tempFilenames);
+        }
+        else if (strcmp(tempC, "nThreads:") == 0)
+        {
+            opts->nThreads = (int)tempD;
+        }
+        else if (strcmp(tempC, "verbose:") == 0)
+        {
+            if ((int)tempD == 0)
+                opts->verbose = false;
+            else if ((int)tempD == 1)
+                opts->verbose = true;
+            else
+                printf("Invalid verbose, default to 'true'.\n");
+        }
+        else if (strcmp(tempC, "width:") == 0)
+        {
+            opts->width = (int)tempD;
+        }
+        else if (strcmp(tempC, "height:") == 0)
+        {
+            opts->height = (int)tempD;
+        }
+        else if (strcmp(tempC, "depth:") == 0)
+        {
+            opts->depth = (int)tempD;
+        }
+        else if (strcmp(tempC, "TH:") == 0)
+        {
+            opts->TH = (unsigned char)tempD;
+        }
+        else if (strcmp(tempC, "inputType:") == 0)
+        {
+            opts->inputType = (int)tempD;
+        }
+        else if (strcmp(tempC, "maxR:") == 0)
+        {
+            opts->maxR = (int)tempD;
+        }
+        else if (strcmp(tempC, "leadZero:") == 0)
+        {
+            opts->LeadZero = (char)tempD;
+        }
+        else if (strcmp(tempC, "nSlices:") == 0)
+        {
+            opts->stackSize = (int)tempD;
+        }
+    }
+    return 0;
+}
+
+int readCSV(char *target_name,
+            char *P,
+            sizeInfo *structureInfo)
+{
+    /*
+        Function readCSV:
+        Inputs:
+            - pointer to file name
+            - pointer to P, where structure will be stored
+            - pointer to sizeInfo struct.
+        Output:
+            - None
+
+        Function will read structure from csv file.
+    */
     // read data structure
 
     int height, width;
@@ -54,11 +308,11 @@ int readCSV(char*           target_name,
     width = structureInfo->width;
     long int nElements = structureInfo->nElements;
 
-    // declare arrays to hold coordinate values for solid phase 
+    // declare arrays to hold coordinate values for solid phase
 
-    int *x = (int *)malloc(sizeof(int)*nElements);
-    int *y = (int *)malloc(sizeof(int)*nElements);
-    int *z = (int *)malloc(sizeof(int)*nElements);
+    int *x = (int *)malloc(sizeof(int) * nElements);
+    int *y = (int *)malloc(sizeof(int) * nElements);
+    int *z = (int *)malloc(sizeof(int) * nElements);
 
     // Read structure file
 
@@ -68,7 +322,8 @@ int readCSV(char*           target_name,
 
     // check if file exists
 
-    if (target_data == NULL){
+    if (target_data == NULL)
+    {
         fprintf(stderr, "Error reading file. Exiting program.\n");
         return 1;
     }
@@ -79,24 +334,22 @@ int readCSV(char*           target_name,
 
     fscanf(target_data, "%c,%c,%c", &header[0], &header[1], &header[2]);
 
-    if (debugFlag) printf("Header = %s\n", header);
-
     // Read coordinates
 
     size_t count = 0;
 
-    while (fscanf(target_data, "%d,%d,%d", &x[count], &y[count], &z[count]) == 3){
+    while (fscanf(target_data, "%d,%d,%d", &x[count], &y[count], &z[count]) == 3)
+    {
         count++;
     }
 
     // Build P based on the data we just read
 
-    memset(P, 0, sizeof(char)*nElements);
-
     int index = 0;
 
-    for (long int i = 0; i<count; i++){
-        index = z[i]*height*width + y[i]*width + x[i];
+    for (long int i = 0; i < count; i++)
+    {
+        index = z[i] * height * width + y[i] * width + x[i];
         P[index] = 1;
     }
 
@@ -105,427 +358,289 @@ int readCSV(char*           target_name,
     free(x);
     free(y);
     free(z);
-    fclose(target_data);
 
+    fclose(target_data);
     return 0;
 }
 
-
-int readImg_2D( char*           target_name,
-                unsigned char** targetPtr,
-                sizeInfo2D*     imgInfo)
+int readImg_2D(char *target_name,
+               unsigned char **targetPtr,
+               sizeInfo2D *imgInfo)
 {
+    /*
+        Function readImg_2D:
+        Inputs:
+            - pointer to file name
+            - double pointer to where structure will be stored
+            - pointer to sizeInfo2D struct.
+        Output:
+            - None
+
+        Function will read structure from jpg file.
+    */
     int channel;
 
     *targetPtr = stbi_load(target_name, &imgInfo->width, &imgInfo->height, &channel, 1);
 
-    if (channel != 1) return 1;
+    if (channel != 1)
+        return 1;
 
-    imgInfo->nElements = imgInfo->height*imgInfo->width;
+    imgInfo->nElements = imgInfo->height * imgInfo->width;
 
     return 0;
 }
 
-
-int readStack   (char           *P,
-                sizeInfo*       structureInfo,
-                bool            debugMode)
+int readStack(char *P,
+              options *opts)
 {
+    /*
+        Function readStack:
+        Inputs:
+            - pointer to P, where structure will be stored
+            - pointer to options struct.
+        Output:
+            - None
+
+        Function will read structure from stack of jpg files.
+    */
     long int index;
 
-    char imgName[100];
+    char imgName[1000];
 
     sizeInfo2D tempSize;
 
-    unsigned char* target_img;
-
-    for(int sliceNum = 0; sliceNum < structureInfo->depth; sliceNum++)
+    for (int sliceNum = 0; sliceNum < opts->stackSize; sliceNum++)
     {
+        // pointer to store image
+
+        unsigned char *target_img;
+
         // get image name
-        sprintf(imgName, "%05d.jpg", sliceNum);
-        
+        sprintf(imgName, "%0*d.jpg", opts->LeadZero, sliceNum);
+
         // read image
 
-        if(readImg_2D(imgName, &target_img, &tempSize) == 1)
+        bool flag = 0;
+
+        flag = readImg_2D(imgName, &target_img, &tempSize);
+
+        if (flag == 1)
         {
             // print error if wrong number of channels and debugMode is on
-            if (debugMode) printf("Wrong number of channels on image %d\n", sliceNum);
-            return 1;
-        }
-
-        // Check that the image is the appropriate size
-        // return error statements if the debugFlag is on.
-        
-        if (structureInfo->width != tempSize.width)
-        {
-            if(debugMode)
-            {
-                printf("Dimension mismatch on slice %d\n", sliceNum);
-                printf("Expected Width = %d\n", structureInfo->width);
-                printf("Actual Width   = %d\n", tempSize.width);
-            }
-            return 1;
-        } else if(structureInfo->height != tempSize.height)
-        {
-            if(debugMode)
-            {
-                printf("Dimension mismatch on slice %d\n", sliceNum);
-                printf("Expected Height = %d\n", structureInfo->height);
-                printf("Actual Height   = %d\n", tempSize.height);
-            }
+            if (opts->verbose)
+                printf("Wrong number of channels on image %0*d\n", (int)opts->LeadZero, sliceNum);
             return 1;
         }
 
         // use the information we just read to populate the 3d structure
-
-        for(int rowNum = 0; rowNum < tempSize.height; rowNum++)
+        for (int rowNum = 0; rowNum < tempSize.height; rowNum++)
         {
-            for(int colNum = 0; colNum < tempSize.width; colNum++)
+            for (int colNum = 0; colNum < tempSize.width; colNum++)
             {
-                index = sliceNum*tempSize.width*tempSize.height +        \
-                        rowNum*tempSize.width + colNum;
-                // thresholding at 150
-                if (target_img[rowNum*tempSize.width + colNum] < 150) P[index] = 0;
-                else P[index] = 1;
+                index = sliceNum * tempSize.width * tempSize.height +
+                        rowNum * tempSize.width + colNum;
+                // thresholding at opts->TH
+                if (target_img[rowNum * tempSize.width + colNum] < opts->TH)
+                    P[index] = 0;
+                else
+                    P[index] = 1;
             }
         }
+        free(target_img);
     }
 
-    // Free memory
-
-    free(target_img);
     return 0;
 }
 
-
-int saveLabels2D(char*          P,
-                 char*          R,
-                 int*           L,
-                 sizeInfo2D*    structureInfo,
-                 char*          filename)
+int saveLabels2D(int *R,
+                 int *L,
+                 sizeInfo2D *structureInfo,
+                 char *filename)
 {
+    /*
+        Function saveLabels2D:
+        Inputs:
+            - pointer to R labels
+            - pointer to L labels
+            - pointer to sizeInfo2D struct
+            - pointer to output filename
+        Output:
+            - None
+
+        Function will save labels for this 2D simulation.
+    */
     // read data structure
     int width;
 
     width = structureInfo->width;
-    
+
     long int nElements = structureInfo->nElements;
-    
+
     // Open File
-    
-    FILE *Particle;
 
-    Particle = fopen(filename, "a+");
+    FILE *OUT;
 
-    fprintf(Particle, "x,y,R,L\n");
-    
-    int row,col;
-    
+    OUT = fopen(filename, "w+");
+
+    fprintf(OUT, "x,y,R,L\n");
+
+    int row, col;
+
     // save everything
-    
-    for(int i = 0; i<nElements;i++)
+
+    for (int i = 0; i < nElements; i++)
     {
-        if(R[i]!=-1)
+        if (R[i] != -1)
         {
-            row = i/width;
-            col = i - row*width;
-            fprintf(Particle,"%d,%d,%d,%d\n", col, row, (int) R[i], L[i]);
-        } 
+            row = i / width;
+            col = i - row * width;
+            fprintf(OUT, "%d,%d,%d,%d\n", col, row, R[i], L[i]);
+        }
     }
 
     // close file
-    
-    fclose(Particle);
-    
+
+    fclose(OUT);
+
     return 0;
 }
 
-int saveLabels3D(char*      P,
-                 char*      R,
-                 int*       L,
-                 sizeInfo*  structureInfo,
-                 char*      filename)
+int saveLabels3D(int *R,
+                 int *L,
+                 sizeInfo *structureInfo,
+                 char *filename)
 {
+    /*
+        Function saveLabels3D:
+        Inputs:
+            - pointer to R labels
+            - pointer to L labels
+            - pointer to sizeInfo struct
+            - pointer to output filename
+        Output:
+            - None
+
+        Function will save labels for this 3D simulation.
+    */
     // read data structure
     int height, width;
 
     height = structureInfo->height;
     width = structureInfo->width;
-    
+
     long int nElements = structureInfo->nElements;
-    
+
     // Open File
-    
+
     FILE *Particle;
 
     Particle = fopen(filename, "a+");
 
     fprintf(Particle, "x,y,z,R,L\n");
-    
-    int slice,row,col;
-    
+
+    int slice, row, col;
+
     // save everything
-    
-    for(int i = 0; i<nElements;i++)
+
+    for (int i = 0; i < nElements; i++)
     {
-        if(R[i]!=-1)
+        if (R[i] != -1)
         {
-            slice = i/(height*width);
-            row = (i - slice*height*width)/width;
-            col = (i - slice*height*width - row*width);
-            fprintf(Particle,"%d,%d,%d,%d,%d\n", col, row, slice, (int) R[i], L[i]);
-        } 
+            slice = i / (height * width);
+            row = (i - slice * height * width) / width;
+            col = (i - slice * height * width - row * width);
+            fprintf(Particle, "%d,%d,%d,%d,%d\n", col, row, slice, (int)R[i], L[i]);
+        }
     }
 
     // close file
-    
+
     fclose(Particle);
-    
+
     return 0;
 }
 
-
-long int FindInterface_2D(  char*           mainArray,
-                            long int*       InterfaceArray,
-                            sizeInfo2D*     structureInfo,
-                            int             primaryPhase,
-                            int             numThreads)
+int f_EDT_2D(int *g,
+             int g_index,
+             int x,
+             int i)
 {
-    // read data structure
-
-    int height, width;
-    
-    height = structureInfo->height;
-    width = structureInfo->width;
-    long int nElements = structureInfo->nElements;
-
-    long int interfaceCount = 0;
-
-    // set omp number of CPU threads to use
-
-    omp_set_num_threads(numThreads);
-
-    // Loop variables
-
-    int row, col;
-    bool interfaceFlag;
-    long int temp_index;
-
-    // main loop
-
-    #pragma omp parallel for schedule(auto) private(row, col, interfaceFlag, temp_index)
-    for(long int i = 0; i<nElements; i++)
-    {
-        if(mainArray[i] != primaryPhase) continue;
-
-        interfaceFlag = false;                          // false until proven otherwise
-
-        // Decode index
-        row = i/width;
-        col = (i - row*width);
-
-        // Interface search
-
-        if (row != 0)
-        {
-            temp_index = i - width;
-            if( mainArray[i] != mainArray[temp_index]) interfaceFlag = true;
-        }
-
-        if (row != height - 1)
-        {
-            temp_index = i + width;
-            if( mainArray[i] != mainArray[temp_index]) interfaceFlag = true;
-        }
-
-        if(col != 0)
-        {
-            temp_index = i - 1;
-            if( mainArray[i] != mainArray[temp_index]) interfaceFlag = true;
-        }
-
-        if(col != width - 1)
-        {
-            temp_index = i + 1;
-            if( mainArray[i] != mainArray[temp_index]) interfaceFlag = true;
-        }
-
-        // Continue if it is not an interface
-
-        if (!interfaceFlag) continue;
-
-        #pragma omp critical
-        {
-            InterfaceArray[interfaceCount] = i;
-            interfaceCount++;
-        }
-
-    }
-
-
-    return interfaceCount;
-}
-
-
-long int FindInterface_3D(  char*           mainArray,
-                            long int*       InterfaceArray,
-                            sizeInfo*       structureInfo,
-                            int             primaryPhase,
-                            int             numThreads)
-{
-    // read data structure
-
-    int height, width, depth;
-    
-    height = structureInfo->height;
-    width = structureInfo->width;
-    depth = structureInfo->depth;
-    long int nElements = structureInfo->nElements;
-
-    long int interfaceCount = 0;
-
-    // set omp number of CPU threads to use
-
-    omp_set_num_threads(numThreads);
-
-    // Loop variables
-
-    int row, col, slice;
-    bool interfaceFlag;
-    long int temp_index;
-
-    // main loop
-
-    #pragma omp parallel for schedule(auto) private(row, col, slice, interfaceFlag, temp_index)
-    for(long int i = 0; i<nElements; i++)
-    {
-        if(mainArray[i] != primaryPhase) continue;
-
-        interfaceFlag = false;                          // false until proven otherwise
-
-        // Decode index
-
-        slice = i/(height*width);
-        row = (i - slice*height*width)/width;
-        col = (i - slice*height*width - row*width);
-
-        // Interface search
-
-        if(slice != 0)
-        {
-            temp_index = i - height*width;
-            if (mainArray[i] != mainArray[temp_index]) interfaceFlag = true;
-        }
-
-        if(slice != depth - 1)
-        {
-            temp_index = i + height*width;
-            if(mainArray[i] != mainArray[temp_index]) interfaceFlag = true;
-        }
-
-        if (row != 0)
-        {
-            temp_index = i - width;
-            if( mainArray[i] != mainArray[temp_index]) interfaceFlag = true;
-        }
-
-        if (row != height - 1)
-        {
-            temp_index = i + width;
-            if( mainArray[i] != mainArray[temp_index]) interfaceFlag = true;
-        }
-
-        if(col != 0)
-        {
-            temp_index = i - 1;
-            if( mainArray[i] != mainArray[temp_index]) interfaceFlag = true;
-        }
-
-        if(col != width - 1)
-        {
-            temp_index = i + 1;
-            if( mainArray[i] != mainArray[temp_index]) interfaceFlag = true;
-        }
-
-        // Continue if it is not an interface
-
-        if (!interfaceFlag) continue;
-
-        #pragma omp critical
-        {
-            InterfaceArray[interfaceCount] = i;
-            interfaceCount++;
-        }
-
-    }
-
-
-    return interfaceCount;
-}
-
-
-int f_EDT_2D(   int*        g,
-                int         g_index,
-                int         x,
-                int         i)
-{
-    int f = (x - i)*(x - i) + g[g_index]*g[g_index];
+    /*
+        Function calculates "f" from the original Meijster Algorithm.
+    */
+    int f = (x - i) * (x - i) + g[g_index] * g[g_index];
     return f;
 }
 
-int f_EDT_3D(   int*        EDT2D,
-                int         EDT2D_index,
-                int         x,
-                int         i)
+int Sep_EDT_2D(int *g,
+               int i,
+               int u,
+               int g_index_i,
+               int g_index_u)
 {
-    int f = (x - i)*(x - i) + EDT2D[EDT2D_index];
-    return f;
-}
-
-int Sep_EDT_2D( int*        g,
-                int         i,
-                int         u,
-                int         g_index_i,
-                int         g_index_u)
-{
-    int Sep = (u*u - i*i + g[g_index_u]*g[g_index_u] - g[g_index_i]*g[g_index_i])/(2*(u-i));
+    /*
+        Function calculates "Sep" from the original Meijster Algorithm.
+    */
+    int Sep = (u * u - i * i + g[g_index_u] * g[g_index_u] - g[g_index_i] * g[g_index_i]) / (2 * (u - i));
     return Sep;
 }
 
-int Sep_EDT_3D( int*        EDT2D,
-                int         i,
-                int         u,
-                int         EDT2D_index_i,
-                int         EDT2D_index_u)
+int pass12_Global(bool *target_arr, float *EDT, int j, int k, int width, int height, int depth, int primaryPhase)
 {
-    int Sep = (u*u - i*i + EDT2D[EDT2D_index_u] - EDT2D[EDT2D_index_i])/(2*(u-i));
-    return Sep;
-}
-
-int pass12_Global(char* target_arr, double* EDT, int j, int k, int width, int height, int depth, int primaryPhase){
+    /*
+        Function pass12_Global:
+        Inputs:
+            - pointer to target_arr, where structure is held
+            - pointer to EDT, where the EDT is held
+            - j and k give column and slice numbers for row scanning
+            - width, height, and depth are the dimensions in number of pixels.
+            - the primary phase is the phase relative to which we calculate the distances.
+        Outputs:
+            - None.
+        This function calculates Pass 1 and 2 according to Meijster algorithm.
+    */
     int stride = width;
-    int offset = k*(width*height) + j;
+    int offset = k * (width * height) + j;
 
-    if(target_arr[offset] == primaryPhase) EDT[offset] = 0;
-    else EDT[offset] = height + width + depth;
+    if (target_arr[offset] == primaryPhase)
+        EDT[offset] = 0;
+    else
+        EDT[offset] = height + width + depth;
 
     // scan 1: forward
-    for(int i = 1; i<height; i++)
+    for (int i = 1; i < height; i++)
     {
-        if(target_arr[offset+i*stride] == primaryPhase) EDT[offset+i*stride] = 0;
-        else EDT[offset+i*stride] = 1 + EDT[offset + (i-1)*stride];
+        if (target_arr[offset + i * stride] == primaryPhase)
+            EDT[offset + i * stride] = 0;
+        else
+            EDT[offset + i * stride] = 1 + EDT[offset + (i - 1) * stride];
     }
     // scan 2: backward
-    for(int i = height - 2; i >= 0; i--)
+    for (int i = height - 2; i >= 0; i--)
     {
-        if(EDT[offset + (i + 1)*stride] < EDT[offset + i*stride]) EDT[offset + i*stride] = 1 + EDT[offset + (i + 1)*stride];
+        if (EDT[offset + (i + 1) * stride] < EDT[offset + i * stride])
+            EDT[offset + i * stride] = 1 + EDT[offset + (i + 1) * stride];
     }
     return 0;
 }
 
-int pass34_Global(double* EDT, double* EDT_temp, int scanLength, int stride, int* s, int* t)
+int pass34_Global(float *EDT, float *EDT_temp, int scanLength, int stride, int *s, int *t)
 {
-    for(int i = 0; i<scanLength; i++) EDT_temp[i] = EDT[i*stride];
+    /*
+        Function pass34_Global:
+        Inputs:
+            - pointer to EDT, where the EDT is held
+            - pointer to EDT_temp, where the old static EDT is held.
+            - scan length gives number of pixels to scan
+            - stride gives the actual memory stride for scanning single directions
+            - pointers to s and t are necessary according to Meijster algorithm
+        Outputs:
+            - None.
+        This function calculates Pass 3 and 4 according to Meijster algorithm. This is repeated (5 and 6)
+        for 3D structures.
+    */
+    for (int i = 0; i < scanLength; i++)
+        EDT_temp[i] = EDT[i * stride];
 
     int q = 0;
     double w = 0;
@@ -534,60 +649,92 @@ int pass34_Global(double* EDT, double* EDT_temp, int scanLength, int stride, int
 
     // forward scan
 
-    for(int u = 1; u<scanLength; u++)
+    for (int u = 1; u < scanLength; u++)
     {
-        while(q >= 0 && (   (pow((t[q] - s[q]),2) + pow(EDT_temp[s[q]], 2)) >= 
-                            (pow((t[q] - u),2) + pow(EDT_temp[u], 2)) )) q--;
-        
-        if(q < 0){
+        while (q >= 0 && ((pow((t[q] - s[q]), 2) + pow(EDT_temp[s[q]], 2)) >=
+                          (pow((t[q] - u), 2) + pow(EDT_temp[u], 2))))
+            q--;
+
+        if (q < 0)
+        {
             q = 0;
             s[0] = u;
             t[0] = 0;
-        } else
+        }
+        else
         {
             w = 1 + trunc(
-                (pow(u,2) - pow(s[q],2) + pow(EDT_temp[u],2) - pow(EDT_temp[s[q]],2))
-                /(2*(double)(u - s[q]))  );
-            if(w < scanLength)
+                        (pow(u, 2) - pow(s[q], 2) + pow(EDT_temp[u], 2) - pow(EDT_temp[s[q]], 2)) / (2 * (double)(u - s[q])));
+            if (w < scanLength)
             {
                 q++;
                 s[q] = u;
-                t[q] = (int) w;
+                t[q] = (int)w;
             }
         }
     }
 
     // backward update
-    for(int u = scanLength - 1; u >=0; u--)
+    for (int u = scanLength - 1; u >= 0; u--)
     {
-        EDT[u*stride] = sqrt(pow(u-s[q],2) + pow(EDT_temp[s[q]],2));
-        if(u == t[q]) q--;
+        EDT[u * stride] = sqrt(pow(u - s[q], 2) + pow(EDT_temp[s[q]], 2));
+        if (u == t[q])
+            q--;
     }
 
     return 0;
 }
 
-int pass12_2D(char* target_arr, int* g, int height, int width, int offset, int primaryPhase)
+int pass12_2D(bool *target_arr, int *g, int height, int width, int offset, int primaryPhase)
 {
+    /*
+        Function pass12_2D:
+        Inputs:
+            - pointer to target_arr, where structure is held
+            - pointer to g, where the EDT is held
+            - width and height are the dimensions in number of pixels.
+            - offset will dicated which column we are performing the current scan.
+            - the primary phase is the phase relative to which we calculate the distances.
+        Outputs:
+            - None.
+        This function calculates Pass 1 and 2 according to Meijster algorithm for the 2D case.
+    */
     // scan 1
-    if (target_arr[offset] == primaryPhase) g[offset] = 0;
-    else g[offset] = height+width;
+    if (target_arr[offset] == primaryPhase)
+        g[offset] = 0;
+    else
+        g[offset] = height + width;
 
     for (int i = 1; i < height; i++)
     {
-        if (target_arr[i*width + offset] == primaryPhase) g[i*width + offset] = 0;
-        else g[i*width + offset] = 1 + g[(i - 1)*width + offset];
+        if (target_arr[i * width + offset] == primaryPhase)
+            g[i * width + offset] = 0;
+        else
+            g[i * width + offset] = 1 + g[(i - 1) * width + offset];
     }
     // scan 2
-    for(int i = height - 2; i >= 0; i--)
+    for (int i = height - 2; i >= 0; i--)
     {
-        if (g[(i+1)*width + offset] < g[i*width + offset]) g[i*width + offset] = 1 + g[(i+1)*width + offset];
+        if (g[(i + 1) * width + offset] < g[i * width + offset])
+            g[i * width + offset] = 1 + g[(i + 1) * width + offset];
     }
     return 0;
 }
 
-int pass34_2D(int* g, int* targetEDT, int width, int offset, int* s, int* t)
+int pass34_2D(int *g, int *targetEDT, int width, int offset, int *s, int *t)
 {
+    /*
+        Function pass34_2D:
+        Inputs:
+            - pointer to g, where the previous EDT is held
+            - pointer to targetEDT, where the new EDT will go.
+            - width is the dimensions in number of pixels.
+            - offset will dicated which row we are performing the current scan.
+            - s and t are necessary for the Meijster algorithm.
+        Outputs:
+            - None.
+        This function calculates Pass 3 and 4 according to Meijster algorithm for the 2D case.
+    */
     // initialize local s and t
     int q = 0;
     int w = 0;
@@ -595,16 +742,19 @@ int pass34_2D(int* g, int* targetEDT, int width, int offset, int* s, int* t)
     t[0] = 0;
 
     // scan 3
-    for(int u = 1; u<width; u++)
+    for (int u = 1; u < width; u++)
     {
-        while (q >= 0 && f_EDT_2D(g, offset*width + s[q], t[q], s[q]) > f_EDT_2D(g, offset*width + u, t[q], u)) q = q - 1;
+        while (q >= 0 && f_EDT_2D(g, offset * width + s[q], t[q], s[q]) > f_EDT_2D(g, offset * width + u, t[q], u))
+            q = q - 1;
 
-        if (q < 0){
+        if (q < 0)
+        {
             q = 0;
             s[0] = u;
-        }else
+        }
+        else
         {
-            w = 1 + Sep_EDT_2D(g, s[q], u, offset*width + s[q], offset*width + u);
+            w = 1 + Sep_EDT_2D(g, s[q], u, offset * width + s[q], offset * width + u);
             if (w < width)
             {
                 q = q + 1;
@@ -614,199 +764,57 @@ int pass34_2D(int* g, int* targetEDT, int width, int offset, int* s, int* t)
         }
     }
     // scan 4
-    for(int u = width - 1; u >= 0; u--)
+    for (int u = width - 1; u >= 0; u--)
     {
-        targetEDT[offset*width + u] = f_EDT_2D(g, offset*width + s[q], u, s[q]);
-        if(u == t[q]) q = q - 1;
+        targetEDT[offset * width + u] = f_EDT_2D(g, offset * width + s[q], u, s[q]);
+        if (u == t[q])
+            q = q - 1;
     }
 
     return 0;
 }
 
-
-int pass12_3D(char* targetArray, int* g, int j, int k, int primaryPhase, int width, int height)
-{
-    // scan 1 (top to bottom)
-    if (targetArray[k*(width*height) + j] == primaryPhase) g[k*(width*height) + j] = 0;
-    else g[k*(width*height) + j] = height+width;
-
-    for (int i = 1; i<height; i++)
-    {
-        int index = k*(width*height) + i*width + j;
-        if (targetArray[index] == primaryPhase) g[index] = 0;
-        else g[index] = 1 + g[index - width];
-    }
-
-    // scan 2 (bottom to top)
-    for(int i = height-2; i >= 0; i--)
-    {
-        int index = k*(width*height) + i*width + j;
-        if (g[index + width] < g[index]) g[index] = 1 + g[index + width];
-    }
-    return 0;
-}
-
-
-int pass34_3D(int* g, int* targetEDT, int* s, int* t, int k, int i, int width, int height)
-{
-    // forward pass 3 (fixed row and slice)
-    int q = 0;
-    int w = 0;
-    s[0] = 0;
-    t[0] = 0;
-    for (int u = 1; u<width; u++)
-    {   // all columns
-        while(q >= 0 && 
-                    f_EDT_2D(g, k*width*height + i*width + s[q], t[q], s[q]) > 
-                            f_EDT_2D(g, k*width*height + i*width + u, t[q], u)) q--;
-        if(q < 0)
-        {
-            q = 0;
-            s[0] = u;
-            t[0] = 0;
-        } else
-        {
-            w = 1 + Sep_EDT_2D(g, s[q], u, k*width*height + i*width + s[q], k*width*height + i*width + u);
-            if (w < width)
-            {
-                q++;
-                s[q] = u;
-                t[q] = w;
-            }
-        }
-    }
-
-    // backward scan
-    for(int u = width - 1; u >= 0; u--)
-    {
-        targetEDT[k*width*height + i*width + u] = f_EDT_2D(g, k*width*height + i*width + s[q], u, s[q]);
-        if(u == t[q]) q--;
-    }
-    return 0;
-}
-
-
-int pass56_3D(int* targetEDT, int* s, int* t, int j, int i, int width, int height, int depth)
-{
-    // forward pass 3
-    int q = 0;
-    int w = 0;
-    s[0] = 0;
-    t[0] = 0;
-
-    for(int u = 1; u<depth; u++){
-        while(q >= 0 && 
-                    f_EDT_3D(targetEDT, s[q]*width*height + i*width + j, t[q], s[q]) > 
-                            f_EDT_3D(targetEDT, u*width*height + i*width + j, t[q], u)) q--;
-
-        if(q < 0)
-        {
-            q = 0;
-            s[0] = u;
-            t[0] = 0;
-        } else
-        {
-            w = 1 + Sep_EDT_3D(targetEDT, s[q], u, s[q]*width*height + i*width + j, u*width*height + i*width + j);
-            if (w < depth)
-            {
-                q++;
-                s[q] = u;
-                t[q] = w;
-            }
-        }
-    }
-    // backward scan
-    for(int u = depth - 1; u >= 0; u--)
-    {
-        targetEDT[u*width*height + i*width + j] = f_EDT_3D(targetEDT, s[q]*width*height + i*width + j, u, s[q]);
-        if(u == t[q]) q--;
-    }
-    return 0;
-}
-
-int pass56_debug(int* EDT, int* s, int* t, int depth, int stride){
-
-    int* EDT_temp = (int*)malloc(sizeof(int)*depth);
-
-    int q = 0;
-    int w = 0;
-
-    s[0] = 0;
-    t[0] = 0;
-
-    for(int i = 0; i<depth; i++){
-        EDT_temp[i] = sqrt(EDT[i*stride]);
-    }
-
-    for(int u = 1; u<depth; u++){
-        while(q>=0 && ( (pow((t[q]-s[q]),2) + pow(EDT_temp[s[q]],2)) >=
-                            (pow((t[q] - u),2) + pow(EDT_temp[u],2)) ) )
-                            q--;
-        
-        if(q<0){
-            q = 0;
-            s[0] = u;
-            t[0] = 0;
-        }
-        else
-        {
-            w = 1 + trunc(
-                (pow(u,2) - pow(s[q],2) + pow(EDT_temp[u],2) - pow(EDT_temp[s[q]],2))/(2*(u - s[q]))
-            );
-            if(w < depth){
-                q++;
-                s[q] = u;
-                t[q] = w;
-            }
-        }
-    }
-
-    // backward pass
-
-    for(int u = depth - 1; u >= 0; u--)
-    {
-        EDT[u*stride] = pow((u - s[q]), 2) + pow(EDT_temp[s[q]],2);
-        if(u <= t[q]) q--;
-    }
-    free(EDT_temp);
-    return 0;
-}
-
-void pMeijster2D(char*           targetArray,
-                int*            targetEDT,
-                sizeInfo2D*     structureInfo,
-                int             primaryPhase)
+void pMeijster2D(bool *targetArray,
+                 int *targetEDT,
+                 sizeInfo2D *structureInfo,
+                 int primaryPhase)
 {
     /*
-        The primary phase determines which phase will be used as the anchor to calculate the EDT.
-        In other words, a primary phase of 1 means the EDT will be calculated on phase 0, and the
-        distances are relative to phase 1.
+        Function pMeijster2D:
+        Inputs:
+            - pointer to targetArray, where the structure is held
+            - pointer to targetEDT, where the EDT will go.
+            - pointer to sizeInfo2D sruct
+            - primaryPhase dictates the phase which the EDT will be calculated in relation to.
+        Outputs:
+            - None.
+        This function calculates the EDT in 2D using parallel computing.
     */
     int height, width;
-    
+
     height = structureInfo->height;
     width = structureInfo->width;
     long int nElements = structureInfo->nElements;
 
-    int* g = (int *)malloc(sizeof(int)*nElements);
+    int *g = (int *)malloc(sizeof(int) * nElements);
 
-    #pragma omp parallel
+#pragma omp parallel
     {
         // local DT, s, and t for each column scan (fixed row)
-        int* s = (int *)malloc(sizeof(int)*width);
-        int* t = (int *)malloc(sizeof(int)*width);
-        memset(s, 0, sizeof(int)*width);
-        memset(t, 0, sizeof(int)*width);
-        // phase 1
-        #pragma omp for schedule(auto)
-        for(int j = 0; j < width; j++)
+        int *s = (int *)malloc(sizeof(int) * width);
+        int *t = (int *)malloc(sizeof(int) * width);
+        memset(s, 0, sizeof(int) * width);
+        memset(t, 0, sizeof(int) * width);
+// phase 1
+#pragma omp for schedule(auto)
+        for (int j = 0; j < width; j++)
         {
             int offset = j;
             pass12_2D(targetArray, g, height, width, offset, primaryPhase);
         }
-        // phase 2
-        #pragma omp for schedule(auto)
-        for(int row = 0; row<height; row++)
+// phase 2
+#pragma omp for schedule(auto)
+        for (int row = 0; row < height; row++)
         {
             int offset = row;
             pass34_2D(g, targetEDT, width, offset, s, t);
@@ -820,130 +828,49 @@ void pMeijster2D(char*           targetArray,
     return;
 }
 
-
-void Meijster2D(char*           targetArray,
-                int*            targetEDT,
-                sizeInfo2D*     structureInfo,
-                int             primaryPhase)
+void pMeijster3D(bool *targetArray,
+                 float *targetEDT,
+                 sizeInfo *structureInfo,
+                 int primaryPhase)
 {
     /*
-        The primary phase determines which phase will be used as the anchor to calculate the EDT.
-        In other words, a primary phase of 1 means the EDT will be calculated on phase 0, and the
-        distances are relative to phase 1.
-    */
-    int height, width;
-    
-    height = structureInfo->height;
-    width = structureInfo->width;
-    long int nElements = structureInfo->nElements;
-
-    int* g = (int *)malloc(sizeof(int)*nElements);
-
-    // First phase of the array: computation of g
-
-    for(int j = 0; j < width; j++)
-    {
-        // scan 1
-        if (targetArray[j] == primaryPhase) g[j] = 0;
-        else g[j] = height+width;
-
-        for (int i = 1; i < height; i++)
-        {
-            if (targetArray[i*width + j] == primaryPhase) g[i*width + j] = 0;
-            else g[i*width + j] = 1 + g[(i - 1)*width + j];
-        }
-        // scan 2
-        for(int i = height - 2; i >= 0; i--)
-        {
-            if (g[(i+1)*width + j] < g[i*width + j]) g[i*width + j] = 1 + g[(i+1)*width + j];
-        }
-    }
-
-    // Second Phase
-
-    int* s = (int *)malloc(sizeof(int)*width);
-    int* t = (int *)malloc(sizeof(int)*width);
-
-    memset(s, 0, sizeof(int)*width);
-    memset(t, 0, sizeof(int)*width);
-
-    for(int row = 0; row < height; row++)
-    {
-        int q = 0;
-        int w = 0;
-        s[0] = 0;
-        t[0] = 0;
-        // scan 3
-        for(int u = 1; u<width; u++)
-        {
-            while (q >= 0 && f_EDT_2D(g, row*width + s[q], t[q], s[q]) > f_EDT_2D(g, row*width + u, t[q], u)) q = q - 1;
-
-            if (q < 0){
-                q = 0;
-                s[0] = u;
-            }else
-            {
-                w = 1 + Sep_EDT_2D(g, s[q], u, row*width + s[q], row*width + u);
-                if (w < width)
-                {
-                    q = q + 1;
-                    s[q] = u;
-                    t[q] = w;
-                }
-            }
-        }
-        // scan 4
-        for(int u = width - 1; u >= 0; u--)
-        {
-            targetEDT[row*width + u] = f_EDT_2D(g, row*width + s[q], u, s[q]);
-            if(u == t[q]) q = q - 1;
-        }
-    }
-
-    free(g);
-    free(s);
-    free(t);
-
-    return;
-}
-
-void pMeijster3D_debug( char*           targetArray,
-                        double*         targetEDT,
-                        sizeInfo*       structureInfo,
-                        int             primaryPhase)
-{
-    /*
-        The primary phase determines which phase will be used as the anchor to calculate the EDT.
-        In other words, a primary phase of 1 means the EDT will be calculated on phase 0, and the
-        distances are relative to phase 1.
+        Function pMeijster3D:
+        Inputs:
+            - pointer to targetArray, where the structure is held
+            - pointer to targetEDT, where the EDT will go.
+            - pointer to sizeInfo sruct
+            - primaryPhase dictates the phase which the EDT will be calculated in relation to.
+        Outputs:
+            - None.
+        This function calculates the EDT in 3D using parallel computing.
     */
     int height, width, depth;
-    
+
     height = structureInfo->height;
     width = structureInfo->width;
     depth = structureInfo->depth;
     long int nElements = structureInfo->nElements;
     long int index = 0;
 
-    #pragma omp parallel
+#pragma omp parallel
     {
         // initialize s and t locally
-        int* s = (int *)malloc(sizeof(int)*width*height);
-        int* t = (int *)malloc(sizeof(int)*width*height);
-        memset(s, 0, sizeof(int)*width*height);
-        memset(t, 0, sizeof(int)*width*height);
+        int *s = (int *)malloc(sizeof(int) * width * height);
+        int *t = (int *)malloc(sizeof(int) * width * height);
+        memset(s, 0, sizeof(int) * width * height);
+        memset(t, 0, sizeof(int) * width * height);
 
-        int LL = (height>width) ? height : width;
+        int LL = (height > width) ? height : width;
         LL = (depth > LL) ? depth : LL;
 
-        double* tempEDT = (double *)malloc(sizeof(double)*LL);
+        float *tempEDT = (float *)malloc(sizeof(float) * LL);
 
         // phase 1
 
-        for(int j = 0; j<width; j++)
+        for (int j = 0; j < width; j++)
         {
-            #pragma omp for schedule(auto)
-            for(int k = 0; k<depth; k++)
+#pragma omp for schedule(auto)
+            for (int k = 0; k < depth; k++)
             {
                 pass12_Global(targetArray, targetEDT, j, k, width, height, depth, primaryPhase);
             }
@@ -951,28 +878,27 @@ void pMeijster3D_debug( char*           targetArray,
 
         // phase 2
 
-        for(int k = 0; k<depth; k++)
-        {   // all slices
-            #pragma omp for schedule(auto)
-            for(int i = 0; i<height; i++)
-            {   // all rows
-                size_t offset = k*width*height + i*width;
+        for (int k = 0; k < depth; k++)
+        { // all slices
+#pragma omp for schedule(auto)
+            for (int i = 0; i < height; i++)
+            { // all rows
+                size_t offset = k * width * height + i * width;
                 pass34_Global(targetEDT + offset, tempEDT, width, 1, s, t);
             }
         }
 
         // maybe not necessary, but clean arrays anyways
-        memset(s, 0, sizeof(int)*width*height);
-        memset(t, 0, sizeof(int)*width*height);
+        memset(s, 0, sizeof(int) * width * height);
+        memset(t, 0, sizeof(int) * width * height);
 
-        for(int j = 0; j<width; j++)
+        for (int j = 0; j < width; j++)
         {
-            #pragma omp for schedule(auto)
-            for(int i = 0; i<height; i++)
+#pragma omp for schedule(auto)
+            for (int i = 0; i < height; i++)
             {
-                // pass56_3D(targetEDT, s, t, j, i, width, height, depth);
-                size_t offset = i*width + j;
-                pass34_Global(targetEDT + offset, tempEDT, depth, height*width, s, t);
+                size_t offset = i * width + j;
+                pass34_Global(targetEDT + offset, tempEDT, depth, height * width, s, t);
             }
         }
         free(s);
@@ -982,243 +908,24 @@ void pMeijster3D_debug( char*           targetArray,
     return;
 }
 
-void pMeijster3D(char*           targetArray,
-                int*            targetEDT,
-                sizeInfo*       structureInfo,
-                int             primaryPhase)
+void ParticleLabel2D(int rMin,
+                     int rMax,
+                     int *R,
+                     int *L,
+                     sizeInfo2D *structureInfo)
 {
     /*
-        The primary phase determines which phase will be used as the anchor to calculate the EDT.
-        In other words, a primary phase of 1 means the EDT will be calculated on phase 0, and the
-        distances are relative to phase 1.
+        Function ParticleLabel2D:
+        Inputs:
+            - rMin
+            - rMax
+            - pointer to R labels (already calculated)
+            - pointer to L (will be calculated in this function)
+            - pointer to sizeInfo2D struct
+        Outputs:
+            - None.
+        This function will attempt labelling all of the particles.
     */
-    int height, width, depth;
-    
-    height = structureInfo->height;
-    width = structureInfo->width;
-    depth = structureInfo->depth;
-    long int nElements = structureInfo->nElements;
-    long int index = 0;
-
-    int* g = (int *)malloc(sizeof(int)*nElements);
-
-    #pragma omp parallel
-    {
-        // initialize s and t locally
-        int* s = (int *)malloc(sizeof(int)*width*height);
-        int* t = (int *)malloc(sizeof(int)*width*height);
-        memset(s, 0, sizeof(int)*width*height);
-        memset(t, 0, sizeof(int)*width*height);
-
-        int LL = (height>width) ? height : width;
-        LL = (depth > LL) ? depth : LL;
-
-        double* tempEDT = (double *)malloc(sizeof(double)*LL);
-
-        // phase 1
-
-        for(int j = 0; j<width; j++)
-        {
-            #pragma omp for schedule(auto)
-            for(int k = 0; k<depth; k++)
-            {
-                pass12_3D(targetArray, g, j, k, primaryPhase, width, height);
-            }
-        }
-
-        // phase 2
-
-        for(int k = 0; k<depth; k++)
-        {   // all slices
-            #pragma omp for schedule(auto)
-            for(int i = 0; i<height; i++)
-            {   // all rows
-                pass34_3D(g, targetEDT, s, t, k, i, width, height);
-            }
-        }
-
-        // maybe not necessary, but clean arrays anyways
-        memset(s, 0, sizeof(int)*width*height);
-        memset(t, 0, sizeof(int)*width*height);
-
-        for(int j = 0; j<width; j++)
-        {
-            #pragma omp for schedule(auto)
-            for(int i = 0; i<height; i++)
-            {
-                // pass56_3D(targetEDT, s, t, j, i, width, height, depth);
-                size_t offset = i*width + j;
-                pass56_debug(targetEDT + offset, s, t, depth, height*width);
-            }
-        }
-        free(s);
-        free(t);
-    }
-
-    free(g);
-    return;
-}
-
-void Meijster3D(char*           targetArray,
-                int*            targetEDT,
-                sizeInfo*       structureInfo,
-                int             primaryPhase)
-{
-    /*
-        The primary phase determines which phase will be used as the anchor to calculate the EDT.
-        In other words, a primary phase of 1 means the EDT will be calculated on phase 0, and the
-        distances are relative to phase 1.
-    */
-    int height, width, depth;
-    
-    height = structureInfo->height;
-    width = structureInfo->width;
-    depth = structureInfo->depth;
-    long int nElements = structureInfo->nElements;
-    long int index = 0;
-
-    int* g = (int *)malloc(sizeof(int)*nElements);
-
-    // First phase of the array: computation of g (column-wise operation)
-
-    // index = slice*(width*height) + row*(width) + col
-
-    for(int j = 0; j < width; j++)
-    {
-        for(int k = 0; k<depth; k++)
-        {
-            // scan 1 (top to bottom)
-            if (targetArray[k*(width*height) + j] == primaryPhase) g[k*(width*height) + j] = 0;
-            else g[k*(width*height) + j] = height+width;
-
-            for (int i = 1; i<height; i++)
-            {
-                index = k*(width*height) + i*width + j;
-                if (targetArray[index] == primaryPhase) g[index] = 0;
-                else g[index] = 1 + g[index - width];
-            }
-
-            // scan 2 (bottom to top)
-            for(int i = height-2; i >= 0; i--)
-            {
-                index = k*(width*height) + i*width + j;
-                if (g[index + width] < g[index]) g[index] = 1 + g[index + width];
-            }
-        }
-    }
-
-    // second phase, computation of distance transforms explicitly
-
-    int* s = (int *)malloc(sizeof(int)*width*height);
-    int* t = (int *)malloc(sizeof(int)*width*height);
-
-    memset(s, 0, sizeof(int)*width*height);
-    memset(t, 0, sizeof(int)*width*height);
-
-    // begin scans
-
-    for(int k = 0; k<depth; k++)
-    {   // all slices
-        for(int i = 0; i<height; i++)
-        {   // all rows
-            // forward pass 3 (fixed row and slice)
-            int q = 0;
-            int w = 0;
-            s[0] = 0;
-            t[0] = 0;
-            for (int u = 1; u<width; u++)
-            {   // all columns
-                while(q >= 0 && 
-                            f_EDT_2D(g, k*width*depth + i*width + s[q], t[q], s[q]) > 
-                                    f_EDT_2D(g, k*width*depth + i*width + u, t[q], u)) q--;
-                if(q < 0)
-                {
-                    q = 0;
-                    s[0] = u;
-                    t[0] = 0;
-                } else
-                {
-                    w = 1 + Sep_EDT_2D(g, s[q], u, k*width*height + i*width + s[q], k*width*height + i*width + u);
-                    if (w < width)
-                    {
-                        q++;
-                        s[q] = u;
-                        t[q] = w;
-                    }
-                }
-            }
-
-            // backward scan
-            for(int u = width - 1; u >= 0; u--)
-            {
-                targetEDT[k*width*height + i*width + u] = f_EDT_2D(g, k*width*height + i*width + s[q], u, s[q]);
-                if(u == t[q]) q--;
-            }
-        }
-    }
-
-    // reset s and t
-
-    memset(s, 0, sizeof(int)*width*height);
-    memset(t, 0, sizeof(int)*width*height);
-
-    // now for all slices
-
-    for(int j = 0; j<width; j++)
-    {
-        for(int i = 0; i<height; i++)
-        {
-            // forward pass 3
-            int q = 0;
-            int w = 0;
-            s[0] = 0;
-            t[0] = 0;
-
-            for(int u = 1; u<depth; u++){
-                while(q >= 0 && 
-                            f_EDT_3D(targetEDT, s[q]*width*depth + i*width + j, t[q], s[q]) > 
-                                    f_EDT_3D(targetEDT, u*width*depth + i*width + j, t[q], u)) q--;
-
-                if(q < 0)
-                {
-                    q = 0;
-                    s[0] = u;
-                    t[0] = 0;
-                } else
-                {
-                    w = 1 + Sep_EDT_3D(targetEDT, s[q], u, s[q]*width*height + i*width + j, u*width*height + i*width + j);
-                    if (w < depth)
-                    {
-                        q++;
-                        s[q] = u;
-                        t[q] = w;
-                    }
-                }
-            }
-            // backward scan
-            for(int u = depth - 1; u >= 0; u--)
-            {
-                targetEDT[u*width*height + i*width + j] = f_EDT_3D(targetEDT, s[q]*width*height + i*width + j, u, s[q]);
-                if(u == t[q]) q--;
-            }
-        }
-    }
-
-    // memory management
-
-    free(s);
-    free(t);
-    free(g);
-
-    return;
-}
-
-void ParticleLabel2D(   int             rMin,
-                        int             rMax,
-                        char*           R,
-                        int*            L,
-                        sizeInfo2D*     structureInfo)
-{
 
     // open list
 
@@ -1241,18 +948,19 @@ void ParticleLabel2D(   int             rMin,
 
     int r = rMin;
 
-    while (r <= rMax)       // main loop
+    while (r <= rMax) // main loop
     {
-        for(int i = 0; i<nElements; i++)
+        for (int i = 0; i < nElements; i++)
         {
-            if (R[i] != r || L[i] != -1) continue;
+            if (R[i] != r || L[i] != -1)
+                continue;
 
             // Label L[i] accordingly and add it to scan list
 
             L[i] = particleLabel;
 
             oList.push_back(i);
-            while(!oList.empty())       // Flood-Fill search starting from this label alone
+            while (!oList.empty()) // Flood-Fill search starting from this label alone
             {
                 // pop first index on the list and erase it
                 long int index = *oList.begin();
@@ -1260,69 +968,78 @@ void ParticleLabel2D(   int             rMin,
 
                 // decode index
 
-                myRow = index/width;
-                myCol = index - myRow*width;
+                myRow = index / width;
+                myCol = index - myRow * width;
 
                 // Search Neighbords with the same r
 
-                if(myRow != 0)
+                if (myRow != 0)
                 {
                     temp_index = index - width;
-                    if(L[temp_index] == -1 && R[temp_index] == r)
+                    if (L[temp_index] == -1 && R[temp_index] == r)
                     {
                         oList.push_back(temp_index);
                         L[temp_index] = particleLabel;
                     }
                 }
 
-                if(myRow != height - 1)
+                if (myRow != height - 1)
                 {
                     temp_index = index + width;
-                    if(L[temp_index] == -1 && R[temp_index] == r)
+                    if (L[temp_index] == -1 && R[temp_index] == r)
                     {
                         oList.push_back(temp_index);
                         L[temp_index] = particleLabel;
                     }
                 }
 
-                if(myCol != 0)
+                if (myCol != 0)
                 {
                     temp_index = index - 1;
-                    if(L[temp_index] == -1 && R[temp_index] == r)
+                    if (L[temp_index] == -1 && R[temp_index] == r)
                     {
                         oList.push_back(temp_index);
                         L[temp_index] = particleLabel;
                     }
                 }
 
-                if(myCol != width - 1)
+                if (myCol != width - 1)
                 {
                     temp_index = index + 1;
-                    if(L[temp_index] == -1 && R[temp_index] == r)
+                    if (L[temp_index] == -1 && R[temp_index] == r)
                     {
                         oList.push_back(temp_index);
                         L[temp_index] = particleLabel;
                     }
                 }
 
-            }   // end inner while
-            particleLabel++;        // push label increment
-            printf("Particle Label = %d, rad = %d\n", particleLabel, r);
-        }   // end for
-        r++;                        // increase radius label
+            } // end inner while
+            particleLabel++; // push label increment
+        } // end for
+        r++; // increase radius label
     } // end while
 
     return;
 }
 
-
-void ParticleLabel3D(   int             rMin,
-                        int             rMax,
-                        char*           R,
-                        int*            L,
-                        sizeInfo*       structureInfo)
+void ParticleLabel3D(int rMin,
+                     int rMax,
+                     int *R,
+                     int *L,
+                     sizeInfo *structureInfo)
 {
-
+    /*
+        Function ParticleLabel3D:
+        Inputs:
+            - rMin
+            - rMax
+            - pointer to R labels (already calculated)
+            - pointer to L (will be calculated in this function)
+            - pointer to sizeInfo struct
+        Outputs:
+            - None.
+        This function will attempt labelling all of the particles.
+    */
     // open list
 
     std::list<long int> oList;
@@ -1345,18 +1062,19 @@ void ParticleLabel3D(   int             rMin,
 
     int r = rMin;
 
-    while (r <= rMax)       // main loop
+    while (r <= rMax) // main loop
     {
-        for(int i = 0; i<nElements; i++)
+        for (int i = 0; i < nElements; i++)
         {
-            if (R[i] != r || L[i] != -1) continue;
+            if (R[i] != r || L[i] != -1)
+                continue;
 
             // Label L[i] accordingly and add it to scan list
 
             L[i] = particleLabel;
 
             oList.push_back(i);
-            while(!oList.empty())       // Flood-Fill search starting from this label alone
+            while (!oList.empty()) // Flood-Fill search starting from this label alone
             {
                 // pop first index on the list and erase it
                 long int index = *oList.begin();
@@ -1364,669 +1082,1041 @@ void ParticleLabel3D(   int             rMin,
 
                 // decode index
 
-                mySlice = index/(height*width);
-                myRow = (index - mySlice*height*width)/width;
-                myCol = (index - mySlice*height*width - myRow*width);
+                mySlice = index / (height * width);
+                myRow = (index - mySlice * height * width) / width;
+                myCol = (index - mySlice * height * width - myRow * width);
 
                 // Search Neighbords with the same r
 
-                if(mySlice != 0)
+                if (mySlice != 0)
                 {
-                    temp_index = index - height*width;
-                    if(L[temp_index] == -1 && R[temp_index] == r)
+                    temp_index = index - height * width;
+                    if (L[temp_index] == -1 && R[temp_index] == r)
                     {
                         oList.push_back(temp_index);
                         L[temp_index] = particleLabel;
                     }
                 }
 
-                if(mySlice != depth - 1)
+                if (mySlice != depth - 1)
                 {
-                    temp_index = index + height*width;
-                    if(L[temp_index] == -1 && R[temp_index] == r)
+                    temp_index = index + height * width;
+                    if (L[temp_index] == -1 && R[temp_index] == r)
                     {
                         oList.push_back(temp_index);
                         L[temp_index] = particleLabel;
                     }
                 }
 
-                if(myRow != 0)
+                if (myRow != 0)
                 {
                     temp_index = index - width;
-                    if(L[temp_index] == -1 && R[temp_index] == r)
+                    if (L[temp_index] == -1 && R[temp_index] == r)
                     {
                         oList.push_back(temp_index);
                         L[temp_index] = particleLabel;
                     }
                 }
 
-                if(myRow != height - 1)
+                if (myRow != height - 1)
                 {
                     temp_index = index + width;
-                    if(L[temp_index] == -1 && R[temp_index] == r)
+                    if (L[temp_index] == -1 && R[temp_index] == r)
                     {
                         oList.push_back(temp_index);
                         L[temp_index] = particleLabel;
                     }
                 }
 
-                if(myCol != 0)
+                if (myCol != 0)
                 {
                     temp_index = index - 1;
-                    if(L[temp_index] == -1 && R[temp_index] == r)
+                    if (L[temp_index] == -1 && R[temp_index] == r)
                     {
                         oList.push_back(temp_index);
                         L[temp_index] = particleLabel;
                     }
                 }
 
-                if(myCol != width - 1)
+                if (myCol != width - 1)
                 {
                     temp_index = index + 1;
-                    if(L[temp_index] == -1 && R[temp_index] == r)
+                    if (L[temp_index] == -1 && R[temp_index] == r)
                     {
                         oList.push_back(temp_index);
                         L[temp_index] = particleLabel;
                     }
                 }
 
-            }   // end inner while
-            particleLabel++;        // push label increment
-        }   // end for
-        r++;                        // increase radius label
+            } // end inner while
+            particleLabel++; // push label increment
+        } // end for
+        r++; // increase radius label
     } // end while
 
     return;
 }
 
-
 /*--------------------------------------------------------
-    
+
                     Worker Functions
 
  --------------------------------------------------------*/
 
-int particleSD_2D_Meijster( char*          P,
-                            char*          E, 
-                            char*          D,
-                            char*          R, 
-                            long int*      InterfaceArray, 
-                            int            radius, 
-                            int            numThreads, 
-                            char*          output_name,
-                            sizeInfo2D*    structureInfo,
-                            bool           debugFlag)
+int partSD_2D(options *opts,
+              sizeInfo2D *info,
+              char *P,
+              char POI)
 {
-    // read data structure
-    int height, width;
-    height = structureInfo->height;
-    width = structureInfo->width;
-    long int nElements = structureInfo->nElements;
+    /*
+        Function partSD_2D:
+        Inputs:
+            - pointer to options struct
+            - pointer to structure info struct
+            - pointer to phase-array
+            - char phase of interest
+        Outputs:
+            - None.
+        Function will calculate particle size distribution of array P.
+    */
 
-    // loop variables
+    if (opts->verbose)
+        printf("Particle-Size Distribution 2D:\n");
+
+    // Loop variables
 
     long int p_sum, d_sum, e_sum;
-    p_sum = 1;
-    e_sum = 1;
-    d_sum = 1;
-    int primaryPhase = 0;
 
-    int* EDT_Pore = (int *)malloc(sizeof(int)*nElements);
-    int* EDT_Particle = (int *)malloc(sizeof(int)*nElements);
+    e_sum = 1; // have to initialize, otherwise loop won't start
 
-    memset(EDT_Pore, 0, sizeof(int)*nElements);
-    memset(EDT_Particle, 0, sizeof(int)*nElements);
+    // array for saving p, e, and d at different R's
 
-    omp_set_num_threads(numThreads);
+    // Index 0 = p, index 1 = d, index 2 = e
 
-    // Open output file
+    long int *PDE_sum = (long int *)malloc(sizeof(long int) * opts->maxR * 3);
 
-    FILE *OUT;
+    memset(PDE_sum, 0, sizeof(long int) * opts->maxR * 3);
 
-    OUT = fopen(output_name, "w+");
-    fprintf(OUT, "R,P,E,D\n");
+    // Array for storing radii
 
-    // EDT for particle only needs to be done once, since we copy P into E at the first step each time
+    int *R;
+    int *L;
 
-    pMeijster2D(P, EDT_Particle, structureInfo, 0);
-
-    while (e_sum != 0 && radius < MAX_R )
+    if (opts->partLabel)
     {
-        memcpy(D,P,sizeof(char)*nElements);     // probably not necessary
+        R = (int *)malloc(sizeof(int) * info->nElements);
+        L = (int *)malloc(sizeof(int) * info->nElements);
 
-        for(int row = 0; row<height; row++)
+        for (int i = 0; i < info->nElements; i++)
         {
-            for(int col = 0; col<width; col++)
-            {
-                if(EDT_Particle[row*width + col] <= radius*radius) D[row*width + col] = 0;
-            }
+            R[i] = -1;
+            L[i] = -1;
+        }
+    }
+
+    // arrays for holding the EDM:
+
+    /*
+        Condsider making those long int's for large domains
+    */
+
+    int *EDT_D = (int *)malloc(sizeof(int) * info->nElements);
+    int *EDT_E = (int *)malloc(sizeof(int) * info->nElements);
+
+    memset(EDT_D, 0, sizeof(int) * info->nElements);
+    memset(EDT_E, 0, sizeof(int) * info->nElements);
+
+    // arrays for erosion and dilation
+
+    bool *E = (bool *)malloc(sizeof(bool) * info->nElements);
+    bool *D = (bool *)malloc(sizeof(bool) * info->nElements);
+    bool *B = (bool *)malloc(sizeof(bool) * info->nElements);
+
+    memset(E, 0, sizeof(bool) * info->nElements);
+    memset(D, 0, sizeof(bool) * info->nElements);
+    memset(B, 0, sizeof(bool) * info->nElements);
+
+// If POI, bool = 1
+#pragma omp parallel for schedule(auto)
+    for (int i = 0; i < info->nElements; i++)
+    {
+        if (P[i] == POI)
+            B[i] = 1;
+    }
+
+    // EDT for dilation is a one time operation
+
+    pMeijster2D(B, EDT_D, info, 0); // 0 is the phase that will be dilated
+
+    int radius = 1;
+
+    while (e_sum != 0 && radius <= opts->maxR)
+    {
+        // copy P into D (probably not necessary)
+
+        memcpy(D, B, sizeof(bool) * info->nElements);
+#pragma omp parallel for schedule(auto)
+        for (int i = 0; i < info->nElements; i++)
+        {
+            if (EDT_D[i] <= radius * radius)
+                D[i] = 0;
         }
 
         // copy D into E
 
-        memcpy(E, D, sizeof(char)*nElements);
+        memcpy(E, D, sizeof(bool) * info->nElements);
 
-        // Meijster algorithm in D for pore-space EDT
+        // Meijster in D
 
-        pMeijster2D(D, EDT_Pore, structureInfo, 1);
+        pMeijster2D(D, EDT_E, info, 1);
 
-        // Update D
-        for(int row = 0; row<height; row++)
+// Update E
+#pragma omp parallel for schedule(auto)
+        for (int i = 0; i < info->nElements; i++)
         {
-            for(int col = 0; col<width; col++)
-            {
-                if(EDT_Pore[row*width + col] <= radius*radius) E[row*width + col] = 1;
-            }
+            if (EDT_E[i] <= radius * radius)
+                E[i] = 1;
         }
-
-        // evaluate sums 
 
         e_sum = 0;
         d_sum = 0;
         p_sum = 0;
-        #pragma omp parallel for reduction(+:p_sum, d_sum, e_sum)
-        for(int i = 0; i<nElements; i++){
-            p_sum += P[i];
+#pragma omp parallel for reduction(+ : p_sum, d_sum, e_sum)
+        for (int i = 0; i < info->nElements; i++)
+        {
+            p_sum += B[i];
             d_sum += D[i];
             e_sum += E[i];
-            if(P[i] - E[i] == 1 && R[i] == -1) R[i] = radius;
+
+            if (!opts->partLabel)
+                continue;
+
+            if (P[i] - E[i] == 1 && R[i] == -1)
+                R[i] = radius;
         }
-        
-        // print to output file
 
-        if(debugFlag) printf("R = %d, P = %ld, E = %ld, D = %ld\n", radius, p_sum, e_sum, d_sum);
-        fprintf(OUT, "%d,%ld,%ld,%ld\n", radius, p_sum, e_sum, d_sum);
+        PDE_sum[(radius - 1) * 3 + 0] = p_sum;
+        PDE_sum[(radius - 1) * 3 + 1] = d_sum;
+        PDE_sum[(radius - 1) * 3 + 2] = e_sum;
 
+        // print verbose
+
+        if (opts->verbose)
+            printf("R = %d, P = %ld, E = %ld, D = %ld\n", radius, p_sum, e_sum, d_sum);
+
+        // increment radius
         radius++;
     }
 
-    // close files
-    fclose(OUT);
+    int lastR = radius;
 
-    // free memory on host
+    // calculate partSD and print to output file
 
-    free(EDT_Particle);
-    free(EDT_Pore);
+    long int sum_removed = 0;
+    double *partRemoved = (double *)malloc(sizeof(double) * lastR);
 
-    return radius;
+    // get particles removed at R = 1
+
+    partRemoved[0] = PDE_sum[0 * 3 + 0] - PDE_sum[0 * 3 + 2];
+    sum_removed += (int)partRemoved[0];
+
+    for (int i = 1; i < lastR; i++)
+    {
+        partRemoved[i] = PDE_sum[(i - 1) * 3 + 2] - PDE_sum[i * 3 + 2];
+        sum_removed += (int)partRemoved[i];
+    }
+
+    FILE *partSD_OUT = fopen(opts->partSD_Out, "w+");
+
+    fprintf(partSD_OUT, "r,p(r)\n");
+    for (int i = 0; i < lastR; i++)
+    {
+        fprintf(partSD_OUT, "%d,%lf\n", i + 1, (double)partRemoved[i] / sum_removed);
+    }
+
+    fclose(partSD_OUT);
+
+    // partial memory management
+
+    free(partRemoved);
+    free(PDE_sum);
+
+    // Derive particle labels from R, if applicable
+
+    if (opts->partLabel)
+    {
+        ParticleLabel2D(opts->radOff, lastR, R, L, info);
+        saveLabels2D(R, L, info, opts->partLabel_Out);
+        free(R);
+        free(L);
+    }
+
+    // memory management
+
+    free(EDT_D);
+    free(EDT_E);
+
+    free(B);
+    free(E);
+    free(D);
+
+    return 0;
 }
 
-
-
-int particleSD_3D_Meijster( char*      P,
-                            char*      E, 
-                            char*      D,
-                            char*      R, 
-                            long int*  InterfaceArray, 
-                            int        radius, 
-                            int        numThreads, 
-                            char*      output_name,
-                            sizeInfo*  structureInfo,
-                            bool       debugFlag)
+int poreSD_2D(options *opts,
+              sizeInfo2D *info,
+              char *P,
+              char POI)
 {
-    // read data structure
-    int height, width, depth;
-    height = structureInfo->height;
-    width = structureInfo->width;
-    depth = structureInfo->depth;
-    long int nElements = structureInfo->nElements;
+    /*
+        Function poreSD_2D:
+        Inputs:
+            - pointer to options struct
+            - pointer to structure info struct
+            - pointer to phase-array
+            - char phase of interest
+        Outputs:
+            - None.
+        Function will calculate pore size distribution of array P.
+    */
+
+    if (opts->verbose)
+        printf("Pore-Size Distribution 2D:\n");
+
+    // Loop variables
 
     long int p_sum, d_sum, e_sum;
-    p_sum = 1;
-    e_sum = 1;
-    d_sum = 1;
-    int primaryPhase = 0;
 
-    omp_set_num_threads(numThreads);
+    e_sum = 1; // have to initialize, otherwise loop won't start
 
-    // int* EDT_Pore = (int *)malloc(sizeof(int)*nElements);
-    // int* EDT_Particle = (int *)malloc(sizeof(int)*nElements);
+    // array for saving p, e, and d at different R's
 
-    // memset(EDT_Pore, 0, sizeof(int)*nElements);
-    // memset(EDT_Particle, 0, sizeof(int)*nElements);
-    double* EDT_Pore = (double *)malloc(sizeof(double)*nElements);
-    double* EDT_Particle = (double *)malloc(sizeof(double)*nElements);
+    // Index 0 = p, index 1 = d, index 2 = e
 
-    memset(EDT_Pore, 0, sizeof(double)*nElements);
-    memset(EDT_Particle, 0, sizeof(double)*nElements);
+    long int *PDE_sum = (long int *)malloc(sizeof(long int) * opts->maxR * 3);
 
-    /*-------------------------------------------------------
-    
-                        Main Loop
-    
-    -------------------------------------------------------*/
-    // EDT for particle only needs to be done once, since we copy P into E at the first step each time
+    memset(PDE_sum, 0, sizeof(long int) * opts->maxR * 3);
 
-    // pMeijster3D(P, EDT_Particle, structureInfo, 0);
-    pMeijster3D_debug(P, EDT_Particle, structureInfo, 0);
+    // Array for storing radii
 
-    // FILE *EDT;
+    int *R;
+    int *L;
 
-    // EDT = fopen("Meijster_xz.csv", "w+");
-    // fprintf(EDT, "x,z,EDT\n");
-
-    // for(int j = 0; j<width; j++){
-    //     for(int k = 0; k<depth; k++){
-    //         fprintf(EDT,"%d,%d,%d\n", j,k, EDT_Particle[k*width*height + j]);
-    //     }
-    // }
-
-    // fclose(EDT);
-
-    // Open output file
-
-    FILE *OUT;
-
-    OUT = fopen(output_name, "w+");
-    fprintf(OUT, "R,P,E,D\n");
-
-    long int interfaceCount = 0;
-
-    while (e_sum != 0 && radius < MAX_R )
+    if (opts->partLabel)
     {
-        memcpy(D,P,sizeof(char)*nElements);     // probably not necessary
+        R = (int *)malloc(sizeof(int) * info->nElements);
+        L = (int *)malloc(sizeof(int) * info->nElements);
 
-        for(int i = 0; i<nElements; i++){
-            if((int) pow(EDT_Particle[i],2) <= radius*radius) D[i] = 0;
+        for (int i = 0; i < info->nElements; i++)
+        {
+            R[i] = -1;
+            L[i] = -1;
+        }
+    }
+
+    // arrays for holding the EDM:
+
+    int *EDT_D = (int *)malloc(sizeof(int) * info->nElements);
+    int *EDT_E = (int *)malloc(sizeof(int) * info->nElements);
+
+    memset(EDT_D, 0, sizeof(int) * info->nElements);
+    memset(EDT_E, 0, sizeof(int) * info->nElements);
+
+    // arrays for erosion and dilation
+
+    bool *E = (bool *)malloc(sizeof(bool) * info->nElements);
+    bool *D = (bool *)malloc(sizeof(bool) * info->nElements);
+    bool *B = (bool *)malloc(sizeof(bool) * info->nElements);
+
+    memset(E, 0, sizeof(bool) * info->nElements);
+    memset(D, 0, sizeof(bool) * info->nElements);
+    memset(B, 0, sizeof(bool) * info->nElements);
+
+// If POI, bool = 1
+#pragma omp parallel for schedule(auto)
+    for (int i = 0; i < info->nElements; i++)
+    {
+        if (P[i] == POI)
+            B[i] = 1;
+    }
+
+    // EDT for dilation is a one time operation
+
+    pMeijster2D(B, EDT_D, info, 0); // 0 is the phase that will be dilated
+
+    int radius = 1;
+
+    while (e_sum != 0 && radius < opts->maxR)
+    {
+        // copy P into D (probably not necessary)
+
+        memcpy(D, B, sizeof(bool) * info->nElements);
+#pragma omp parallel for schedule(auto)
+        for (int i = 0; i < info->nElements; i++)
+        {
+            if (EDT_D[i] <= radius * radius)
+                D[i] = 0;
         }
 
         // copy D into E
 
-        memcpy(E, D, sizeof(char)*nElements);
+        memcpy(E, D, sizeof(bool) * info->nElements);
 
-        // Meijster algorithm in D for pore-space EDT
-        
-        memset(EDT_Pore, 0, sizeof(int)*nElements);
+        // Meijster in D
 
-        pMeijster3D_debug(D, EDT_Pore, structureInfo, 1);
+        pMeijster2D(D, EDT_E, info, 1);
 
-        // Update E
-        for(int i = 0; i<nElements; i++){
-            if((int) pow(EDT_Pore[i],2) <= radius*radius) E[i] = 1;
+// Update E
+#pragma omp parallel for schedule(auto)
+        for (int i = 0; i < info->nElements; i++)
+        {
+            if (EDT_E[i] <= radius * radius)
+                E[i] = 1;
         }
-
-        // evaluate sums 
 
         e_sum = 0;
         d_sum = 0;
         p_sum = 0;
-        #pragma omp parallel for reduction(+:p_sum, d_sum, e_sum)
-        for(int i = 0; i<nElements; i++){
-            p_sum += P[i];
+#pragma omp parallel for reduction(+ : p_sum, d_sum, e_sum)
+        for (int i = 0; i < info->nElements; i++)
+        {
+            p_sum += B[i];
             d_sum += D[i];
             e_sum += E[i];
-            if(P[i] - E[i] == 1 && R[i] == -1) R[i] = radius;
+
+            if (!opts->poreLabel)
+                continue;
+
+            if (B[i] - E[i] == 1 && R[i] == -1)
+                R[i] = radius;
         }
+
+        PDE_sum[(radius - 1) * 3 + 0] = p_sum;
+        PDE_sum[(radius - 1) * 3 + 1] = d_sum;
+        PDE_sum[(radius - 1) * 3 + 2] = e_sum;
 
         // print to output file
 
-        if(debugFlag) printf("R = %d, P = %ld, E = %ld, D = %ld\n", radius, p_sum, e_sum, d_sum);
-        fprintf(OUT, "%d,%ld,%ld,%ld\n", radius, p_sum, e_sum, d_sum);
-
+        if (opts->verbose)
+            printf("R = %d, P = %ld, E = %ld, D = %ld\n", radius, p_sum, e_sum, d_sum);
+        // increment radius
         radius++;
-    } // end while
+    }
 
-    /*---------------------------------------------------------------------
-    
-                            Memory Management
+    int lastR = radius;
 
-    ------------------------------------------------------------------------*/
-    // Files
+    // calculate partSD and print to output file
 
-    fclose(OUT);
+    long int sum_removed = 0;
+    double *poreRemoved = (double *)malloc(sizeof(double) * lastR);
 
-    // Device
+    // get particles removed at R = 1
 
-    // Host
+    poreRemoved[0] = PDE_sum[0 * 3 + 0] - PDE_sum[0 * 3 + 2];
+    sum_removed += (int)poreRemoved[0];
 
-    free(EDT_Pore);
-    free(EDT_Particle);
+    for (int i = 1; i < lastR; i++)
+    {
+        poreRemoved[i] = PDE_sum[(i - 1) * 3 + 2] - PDE_sum[i * 3 + 2];
+        sum_removed += (int)poreRemoved[i];
+    }
 
-    return radius;
+    FILE *poreSD_OUT = fopen(opts->poreSD_Out, "w+");
+
+    fprintf(poreSD_OUT, "r,p(r)\n");
+    for (int i = 0; i < lastR; i++)
+    {
+        fprintf(poreSD_OUT, "%d,%lf\n", i + 1, (double)poreRemoved[i] / sum_removed);
+    }
+
+    fclose(poreSD_OUT);
+
+    // partial memory management
+
+    free(poreRemoved);
+    free(PDE_sum);
+
+    // Derive particle labels from R, if applicable
+
+    if (opts->poreLabel)
+    {
+        ParticleLabel2D(opts->radOff, lastR, R, L, info);
+        saveLabels2D(R, L, info, opts->poreLabel_Out);
+        free(R);
+        free(L);
+    }
+
+    // memory management
+
+    free(EDT_D);
+    free(EDT_E);
+
+    free(B);
+    free(E);
+    free(D);
+
+    return 0;
 }
 
+int partSD_3D(options *opts,
+              sizeInfo *info,
+              char *P,
+              int POI)
+{
+    /*
+        Function poreSD_3D:
+        Inputs:
+            - pointer to options struct
+            - pointer to structure info struct
+            - pointer to phase-array
+            - char phase of interest
+        Outputs:
+            - None.
+        Function will calculate particle size distribution of array P.
+    */
+
+    if (opts->verbose)
+        printf("Particle-Size Distribution 3D:\n");
+
+    // Loop variables
+
+    long int p_sum, d_sum, e_sum;
+
+    e_sum = 1; // have to initialize, otherwise loop won't start
+
+    // array for saving p, e, and d at different R's
+
+    // Index 0 = p, index 1 = d, index 2 = e
+
+    long int *PDE_sum = (long int *)malloc(sizeof(long int) * opts->maxR * 3);
+
+    memset(PDE_sum, 0, sizeof(long int) * opts->maxR * 3);
+
+    // Array for storing radii
+
+    int *R;
+    int *L;
+
+    if (opts->partLabel)
+    {
+        R = (int *)malloc(sizeof(int) * info->nElements);
+        L = (int *)malloc(sizeof(int) * info->nElements);
+
+        for (int i = 0; i < info->nElements; i++)
+        {
+            R[i] = -1;
+            L[i] = -1;
+        }
+    }
+
+    // arrays for holding the EDM:
+
+    float *EDT_D = (float *)malloc(sizeof(float) * info->nElements);
+    float *EDT_E = (float *)malloc(sizeof(float) * info->nElements);
+
+    memset(EDT_D, 0, sizeof(float) * info->nElements);
+    memset(EDT_E, 0, sizeof(float) * info->nElements);
+
+    // arrays for erosion and dilation
+
+    bool *E = (bool *)malloc(sizeof(bool) * info->nElements);
+    bool *D = (bool *)malloc(sizeof(bool) * info->nElements);
+    bool *B = (bool *)malloc(sizeof(bool) * info->nElements);
+
+    memset(E, 0, sizeof(bool) * info->nElements);
+    memset(D, 0, sizeof(bool) * info->nElements);
+    memset(B, 0, sizeof(bool) * info->nElements);
+
+// If POI, bool = 1
+#pragma omp parallel for schedule(auto)
+    for (int i = 0; i < info->nElements; i++)
+    {
+        if (P[i] == POI)
+            B[i] = 1;
+    }
+
+    // EDT for dilation is a one time operation
+
+    pMeijster3D(B, EDT_D, info, 0); // 0 is the phase that will be dilated
+
+    int radius = 1;
+
+    // Main Loop
+
+    while (e_sum != 0 && radius <= opts->maxR)
+    {
+        // copy P into D (probably not necessary)
+
+        memcpy(D, B, sizeof(bool) * info->nElements);
+#pragma omp parallel for schedule(auto)
+        for (int i = 0; i < info->nElements; i++)
+        {
+            if (pow(EDT_D[i], 2) <= (float)radius * radius)
+                D[i] = 0;
+        }
+
+        // Copy D into E
+
+        memcpy(E, D, sizeof(bool) * info->nElements);
+
+        // Meijster in D
+
+        pMeijster3D(D, EDT_E, info, 1);
+
+// Update E
+#pragma omp parallel for schedule(auto)
+        for (int i = 0; i < info->nElements; i++)
+        {
+            if (pow(EDT_E[i], 2) <= (float)radius * radius)
+                E[i] = 1;
+        }
+
+        // Quantify changes
+
+        e_sum = 0;
+        d_sum = 0;
+        p_sum = 0;
+
+#pragma omp parallel for reduction(+ : p_sum, d_sum, e_sum)
+        for (int i = 0; i < info->nElements; i++)
+        {
+            p_sum += B[i];
+            d_sum += D[i];
+            e_sum += E[i];
+
+            if (!opts->partLabel)
+                continue;
+
+            if (B[i] - E[i] == 1 && R[i] == -1)
+                R[i] = radius;
+        }
+
+        PDE_sum[(radius - 1) * 3 + 0] = p_sum;
+        PDE_sum[(radius - 1) * 3 + 1] = d_sum;
+        PDE_sum[(radius - 1) * 3 + 2] = e_sum;
+
+        // print verbose
+
+        if (opts->verbose)
+            printf("R = %d, P = %ld, E = %ld, D = %ld\n", radius, p_sum, e_sum, d_sum);
+
+        // increment radius
+        radius++;
+    }
+
+    int lastR = radius;
+
+    // calculate partSD and print to output file
+
+    // calculate partSD and print to output file
+
+    long int sum_removed = 0;
+    double *partRemoved = (double *)malloc(sizeof(double) * lastR);
+
+    // get particles removed at R = 1
+
+    partRemoved[0] = PDE_sum[0 * 3 + 0] - PDE_sum[0 * 3 + 2];
+    sum_removed += (int)partRemoved[0];
+
+    for (int i = 1; i < lastR; i++)
+    {
+        partRemoved[i] = PDE_sum[(i - 1) * 3 + 2] - PDE_sum[i * 3 + 2];
+        sum_removed += (int)partRemoved[i];
+    }
+
+    FILE *partSD_OUT = fopen(opts->partSD_Out, "w+");
+
+    fprintf(partSD_OUT, "r,p(r)\n");
+    for (int i = 0; i < lastR; i++)
+    {
+        fprintf(partSD_OUT, "%d,%lf\n", i + 1, (double)partRemoved[i] / sum_removed);
+    }
+
+    fclose(partSD_OUT);
+
+    // partial memory management
+
+    free(partRemoved);
+    free(PDE_sum);
+
+    // Derive particle labels from R, if applicable
+
+    if (opts->partLabel)
+    {
+        ParticleLabel3D(opts->radOff, lastR, R, L, info);
+        saveLabels3D(R, L, info, opts->partLabel_Out);
+        free(R);
+        free(L);
+    }
+
+    // memory management
+
+    free(EDT_D);
+    free(EDT_E);
+
+    free(B);
+    free(E);
+    free(D);
+
+    return 0;
+}
+
+int poreSD_3D(options *opts,
+              sizeInfo *info,
+              char *P,
+              int POI)
+{
+    /*
+        Function poreSD_3D:
+        Inputs:
+            - pointer to options struct
+            - pointer to structure info struct
+            - pointer to phase-array
+            - char phase of interest
+        Outputs:
+            - None.
+        Function will calculate pore size distribution of array P.
+    */
+
+    if (opts->verbose)
+        printf("Pore-Size Distribution 3D:\n");
+
+    // Loop variables
+
+    long int p_sum, d_sum, e_sum;
+
+    e_sum = 1; // have to initialize, otherwise loop won't start
+
+    // array for saving p, e, and d at different R's
+
+    // Index 0 = p, index 1 = d, index 2 = e
+
+    long int *PDE_sum = (long int *)malloc(sizeof(long int) * opts->maxR * 3);
+
+    memset(PDE_sum, 0, sizeof(long int) * opts->maxR * 3);
+
+    // Array for storing radii
+
+    int *R;
+    int *L;
+
+    if (opts->partLabel)
+    {
+        R = (int *)malloc(sizeof(int) * info->nElements);
+        L = (int *)malloc(sizeof(int) * info->nElements);
+
+        for (int i = 0; i < info->nElements; i++)
+        {
+            R[i] = -1;
+            L[i] = -1;
+        }
+    }
+
+    // arrays for holding the EDM:
+
+    float *EDT_D = (float *)malloc(sizeof(float) * info->nElements);
+    float *EDT_E = (float *)malloc(sizeof(float) * info->nElements);
+
+    memset(EDT_D, 0, sizeof(float) * info->nElements);
+    memset(EDT_E, 0, sizeof(float) * info->nElements);
+
+    // arrays for erosion and dilation
+
+    bool *E = (bool *)malloc(sizeof(bool) * info->nElements);
+    bool *D = (bool *)malloc(sizeof(bool) * info->nElements);
+    bool *B = (bool *)malloc(sizeof(bool) * info->nElements);
+
+    memset(E, 0, sizeof(bool) * info->nElements);
+    memset(D, 0, sizeof(bool) * info->nElements);
+    memset(B, 0, sizeof(bool) * info->nElements);
+
+// If POI, bool = 1
+#pragma omp parallel for schedule(auto)
+    for (int i = 0; i < info->nElements; i++)
+    {
+        if (P[i] == POI)
+            B[i] = 1;
+    }
+
+    // EDT for dilation is a one time operation
+
+    pMeijster3D(B, EDT_D, info, 0); // 0 is the phase that will be dilated
+
+    int radius = 1;
+
+    // Main Loop
+
+    while (e_sum != 0 && radius <= opts->maxR)
+    {
+        // copy B into D (probably not necessary)
+
+        memcpy(D, B, sizeof(bool) * info->nElements);
+#pragma omp parallel for schedule(auto)
+        for (int i = 0; i < info->nElements; i++)
+        {
+            if (pow(EDT_D[i], 2) <= (float)radius * radius)
+                D[i] = 0;
+        }
+
+        // Copy D into E
+
+        memcpy(E, D, sizeof(bool) * info->nElements);
+
+        // Meijster in D
+
+        pMeijster3D(D, EDT_E, info, 1);
+
+// Update E
+#pragma omp parallel for schedule(auto)
+        for (int i = 0; i < info->nElements; i++)
+        {
+            if (pow(EDT_E[i], 2) <= (float)radius * radius)
+                E[i] = 1;
+        }
+
+        // Quantify changes
+
+        e_sum = 0;
+        d_sum = 0;
+        p_sum = 0;
+
+#pragma omp parallel for reduction(+ : p_sum, d_sum, e_sum)
+        for (int i = 0; i < info->nElements; i++)
+        {
+            p_sum += B[i];
+            d_sum += D[i];
+            e_sum += E[i];
+
+            if (!opts->poreLabel)
+                continue;
+
+            if (B[i] - E[i] == 1 && R[i] == -1)
+                R[i] = radius;
+        }
+
+        PDE_sum[(radius - 1) * 3 + 0] = p_sum;
+        PDE_sum[(radius - 1) * 3 + 1] = d_sum;
+        PDE_sum[(radius - 1) * 3 + 2] = e_sum;
+
+        // print verbose
+
+        if (opts->verbose)
+            printf("R = %d, P = %ld, E = %ld, D = %ld\n", radius, p_sum, e_sum, d_sum);
+
+        // increment radius
+        radius++;
+    }
+
+    int lastR = radius;
+
+    // calculate partSD and print to output file
+
+    long int sum_removed = 0;
+    double *partRemoved = (double *)malloc(sizeof(double) * lastR);
+
+    // get particles removed at R = 1
+
+    partRemoved[0] = PDE_sum[0 * 3 + 0] - PDE_sum[0 * 3 + 2];
+    sum_removed += (int)partRemoved[0];
+
+    for (int i = 1; i < lastR; i++)
+    {
+        partRemoved[i] = PDE_sum[(i - 1) * 3 + 2] - PDE_sum[i * 3 + 2];
+        sum_removed += (int)partRemoved[i];
+    }
+
+    FILE *partSD_OUT = fopen(opts->poreSD_Out, "w+");
+
+    fprintf(partSD_OUT, "r,p(r)\n");
+    for (int i = 0; i < lastR; i++)
+    {
+        fprintf(partSD_OUT, "%d,%lf\n", i + 1, (double)partRemoved[i] / sum_removed);
+    }
+
+    fclose(partSD_OUT);
+
+    // partial memory management
+
+    free(partRemoved);
+    free(PDE_sum);
+
+    // Derive particle labels from R, if applicable
+
+    if (opts->poreLabel)
+    {
+        ParticleLabel3D(opts->radOff, lastR, R, L, info);
+        saveLabels3D(R, L, info, opts->poreLabel_Out);
+
+        free(R);
+        free(L);
+    }
+
+    // memory management
+
+    free(EDT_D);
+    free(EDT_E);
+
+    free(B);
+    free(E);
+    free(D);
+
+    return 0;
+}
 
 /*--------------------------------------------------------
-    
+
                     Parent Functions
 
  --------------------------------------------------------*/
 
-int ParticleSizeDist2D(bool debugMode)
+int Sim2D(options *opts)
 {
-    if (debugMode)
-    {
-        printf("------------------------------------------------\n\n");
-        printf("       Particle Size Distribution 2D\n");
-        printf("               (Debug Mode)\n\n");
-        printf("------------------------------------------------\n\n");
-    }
     /*---------------------------------------------------------------------
-    
+
                             Read Input
                                 &
-                          Declare Arrays 
+                          Declare Arrays
 
         Input mode flags:
         - Flag = 0 means jpg image (using stb image).
-        - Flag = 1 means tiff file.             (NOT IMPLEMENTED)
 
     ------------------------------------------------------------------------*/
 
-    // User set variables
+    // declare structure related variables
 
-    int radius_offset = 0;
-    int radius = 1;
-
-    unsigned char* target_img;
+    unsigned char *target_img;
     sizeInfo2D imgInfo;
-    char targetName[50];
-    char output_name[100];
-    bool saveLabels = false;
 
-    char labelsOutput_name[100];
+    // set omp options
 
-    // File names
+    omp_set_num_threads(opts->nThreads);
 
-    sprintf(targetName, "00000.jpg");
-    sprintf(output_name, "00_ED_test.csv");
+    // read structure
 
-    sprintf(labelsOutput_name, "Test_labels2D.csv");
+    if (opts->inputType == 0)
+    {
+        if (readImg_2D(opts->inputFilename, &target_img, &imgInfo) == 1)
+            printf("Error, image has wrong number of channels\n");
+    }
+    else
+    {
+        printf("Method not implemented yet!\n");
+    }
 
-    // Parallel Computing Options Options
+    // Create array to hold structure
 
-    int numThreads = 8;                         // Number of CPU threads to be used
+    char *P = (char *)malloc(sizeof(char) * imgInfo.nElements);
 
-    // Read image
-
-    if (readImg_2D( targetName, &target_img, &imgInfo) == 1) printf("Error, image has wrong number of channels\n");
-
-    if(readImg_2D( targetName, &target_img, &imgInfo) == 1) return 1;
-
-    char* P = (char *)malloc(sizeof(char)*imgInfo.nElements);
-
-    memset(P, 0, sizeof(char)*imgInfo.nElements);
+    memset(P, 0, sizeof(char) * imgInfo.nElements);
 
     // Cast image into P, free original array
 
-    for(int i = 0; i < imgInfo.nElements; i++)
+    for (int i = 0; i < imgInfo.nElements; i++)
     {
-        if(target_img[i] < 150)
-        {
+        if (target_img[i] < opts->TH)
             P[i] = 0;
-        }else
-        {
+        else
             P[i] = 1;
-        }
     }
-
-    // return 0;
 
     free(target_img);
 
-    // Allocate Space for Erosion-Dilation
+    // Perform the selected simulations
 
-    char *E = (char *)malloc(sizeof(char)*imgInfo.nElements);
-    char *D = (char *)malloc(sizeof(char)*imgInfo.nElements);
+    if (opts->partSD)
+        partSD_2D(opts, &imgInfo, P, 1);
 
-    // Initialize ED arrays
+    if (opts->poreSD)
+        poreSD_2D(opts, &imgInfo, P, 0);
 
-    memset(E, 0, sizeof(char) * imgInfo.nElements);
-    memset(D, 0, sizeof(char) * imgInfo.nElements);
-
-    // Label Arrays
-
-    char *R = (char *)malloc(sizeof(char)* imgInfo.nElements);        // array for particle radius
-    int  *L =  (int *)malloc(sizeof(int) * imgInfo.nElements);        // array for particle labels
-
-    // Interface array
-
-    long int *InterfaceArray = (long int *)malloc(sizeof(long int) * imgInfo.nElements);
-
-    // Initialize label arrays and Interface Array
-
-    memset(R,                0, sizeof(char)    * imgInfo.nElements);
-    memset(L,                0, sizeof(int)     * imgInfo.nElements);
-    memset(InterfaceArray,   0, sizeof(long int)* imgInfo.nElements);
-
-    if (debugMode) printf("Structure Read\n");
-
-    // Prepare variables for the main loop
-
-    for(long int i = 0; i<imgInfo.nElements; i++)
-    {
-        R[i] = -1;
-        L[i] = -1;
-    }
-
-    // set radius offset, if any
-
-    if(radius_offset > 0) radius = radius_offset;
-
-    /*---------------------------------------------------------------------
-    
-                            Main Loop
-
-    ------------------------------------------------------------------------*/
-
-    if (debugMode) printf("Starting Main Loop\n");
-
-    // radius = Hybrid_particleSD_2D(P, E, D, R, InterfaceArray, radius,
-    //                               numThreads, output_name, &imgInfo, debugMode);
-
-    radius = particleSD_2D_Meijster(P, E, D, R, InterfaceArray, radius,
-                                    numThreads, output_name, &imgInfo, debugMode);
-
-    /*---------------------------------------------------------------------
-    
-                            Save Labels
-
-    ------------------------------------------------------------------------*/
-
-    if(saveLabels)
-    {
-        // Label Particles
-
-        ParticleLabel2D(3, radius, R, L, &imgInfo);
-        saveLabels2D(P, R, L, &imgInfo, labelsOutput_name);
-    }
-
-    /*---------------------------------------------------------------------
-    
-                            Memory Management
-
-    ------------------------------------------------------------------------*/
-
+    // Memory Management
     free(P);
-    free(E);
-    free(D);
-    free(InterfaceArray);
-    free(R);
-    free(L);
+
     return 0;
 }
 
-
-int PoreSizeDist2D(bool debugMode)
+int Sim3D(options *opts)
 {
-    if (debugMode)
-    {
-        printf("------------------------------------------------\n\n");
-        printf("         Pore Size Distribution 2D\n");
-        printf("             (Debug Mode)\n\n");
-        printf("------------------------------------------------\n\n");
-    }
-    return 0;
-}
-
-
-int ParticleSizeDist3D(bool debugMode)
-{
-    if (debugMode)
-    {
-        printf("------------------------------------------------\n\n");
-        printf("       Particle Size Distribution 3D\n");
-        printf("               (Debug Mode)\n\n");
-        printf("------------------------------------------------\n\n");
-    }
     /*---------------------------------------------------------------------
-    
+
                             Read Input
                                 &
-                          Declare Arrays 
+                          Declare Arrays
 
         Input mode flags:
         - Flag = 0 means .csv file with x,y,z coordinates of the particles.
-        - Flag = 1 means stack of .jpg files    (NOT IMPLEMENTED)
-        - Flag = 2 means tiff file.             (NOT IMPLEMENTED)
-
+        - Flag = 1 means stack of .jpg files
     ------------------------------------------------------------------------*/
 
-    // User Entered Options:
-    int radius_offset = 0;
-    int radius = 1;
-    const unsigned char inputMode = 0;          // hardcoded since its the only option
-    char target_name[100];
-    char output_name[100];
-    bool saveLabels = true;
+    // Structs
 
-    char labelsOutput_name[100];
+    sizeInfo info;
 
-    sprintf(labelsOutput_name, "Test_labels.csv");
+    // define P
 
-    // Output Options
+    char *P;
 
-    int numThreads = 8;                         // Number of CPU threads to be used
+    // read by input type
 
-    // Structure dimension
-
-    sizeInfo structureInfo;
-
-    structureInfo.height = 300;
-    structureInfo.width = 300;
-    structureInfo.depth = 300;
-    structureInfo.nElements = structureInfo.height  * structureInfo.width
-                                                    * structureInfo.depth;
-    // File names
-    
-    sprintf(output_name, "Test_ED.csv");
-
-    if (debugMode)
+    if (opts->inputType == 0)
     {
-        printf("Input File: %s\n", target_name);
-        printf("Height = %d, Width = %d, Depth = %d\n\n", 
-                    structureInfo.height, structureInfo.width,
-                    structureInfo.depth);
+        // Expected structure size
+
+        info.width = opts->width;
+        info.height = opts->height;
+        info.depth = opts->depth;
+        info.nElements = info.depth * info.width * info.height;
+
+        // set omp options
+
+        omp_set_num_threads(opts->nThreads);
+
+        // Declare and Define Phase array
+
+        P = (char *)malloc(sizeof(char) * info.nElements);
+
+        memset(P, 0, sizeof(char) * info.nElements);
+        // read csv
+        readCSV(opts->inputFilename, P, &info);
+    }
+    else if (opts->inputType == 1)
+    {
+        // read one image to get size
+        info.depth = opts->stackSize;
+
+        unsigned char *target_practice;
+
+        char test_name[100];
+
+        sprintf(test_name, "%0*d.jpg", opts->LeadZero, 0);
+
+        int channel;
+
+        target_practice = stbi_load(test_name, &info.width, &info.height, &channel, 1);
+
+        free(target_practice);
+        // set size of P
+
+        info.nElements = info.width * info.height * info.depth;
+
+        P = (char *)malloc(sizeof(char) * info.nElements);
+
+        memset(P, 0, sizeof(char) * info.nElements);
+
+        // read stack onto P
+
+        readStack(P, opts);
     }
 
-    // Allocate Space for Erosion-Dilation
+    // Perform selected simulations
 
-    char *P = (char *)malloc(sizeof(char)*structureInfo.nElements);
-    char *E = (char *)malloc(sizeof(char)*structureInfo.nElements);
-    char *D = (char *)malloc(sizeof(char)*structureInfo.nElements);
+    if (opts->partSD)
+        partSD_3D(opts, &info, P, 1);
 
-    // Initialize ED arrays
-
-    memset(P, 0, sizeof(char) * structureInfo.nElements);
-    memset(E, 0, sizeof(char) * structureInfo.nElements);
-    memset(D, 0, sizeof(char) * structureInfo.nElements);
-
-    // Label Arrays
-
-    char *R = (char *)malloc(sizeof(char)* structureInfo.nElements);        // array for particle radius
-    int  *L =  (int *)malloc(sizeof(int) * structureInfo.nElements);        // array for particle labels
-
-    // Interface array
-
-    long int *InterfaceArray = (long int *)malloc(sizeof(long int) * structureInfo.nElements);
-
-    // Initialize label arrays and Interface Array
-
-    memset(R,                0, sizeof(char)    * structureInfo.nElements);
-    memset(L,                0, sizeof(int)     * structureInfo.nElements);
-    memset(InterfaceArray,   0, sizeof(long int)* structureInfo.nElements);
-
-    // Read and store input
-
-    if (inputMode == 0)
-    {
-        if (debugMode) printf("Reading .csv\n");
-        sprintf(target_name, "rec_837_300_int1.csv");
-        readCSV(target_name, P, &structureInfo, debugMode);
-    } else if(inputMode == 1)
-    {
-        if (debugMode) printf("Reading Stack\n");
-        if (readStack(P, &structureInfo, debugMode) == 1)
-        {
-            printf("Error encountered when reading stack. Consider using Debug Mode\n");
-            printf("Exiting now.\n");
-            return 1;
-        }
-    }
-    
-    if (debugMode) printf("Structure Read\n");
-
-    // Prepare variables for the main loop
-
-    for(long int i = 0; i<structureInfo.nElements; i++)
-    {
-        R[i] = -1;
-        L[i] = -1;
-    }
-
-    if(radius_offset > 0) radius = radius_offset;
-
-    /*---------------------------------------------------------------------
-    
-                            Main Loop
-
-    ------------------------------------------------------------------------*/
-
-    if (debugMode) printf("Starting Main Loop\n");
-
-    // radius = Hybrid_particleSD_3D(P, E, D, R, InterfaceArray, radius,
-    //                               numThreads, output_name, &structureInfo, debugMode);
-    radius = particleSD_3D_Meijster(P, E, D, R, InterfaceArray, radius,
-                                    numThreads, output_name, &structureInfo, debugMode);
-    
-    /*---------------------------------------------------------------------
-    
-                            Save Labels
-
-    ------------------------------------------------------------------------*/
-
-    if(saveLabels)
-    {
-        // Label Particles
-
-        ParticleLabel3D(3, radius, R, L, &structureInfo);
-        saveLabels3D(P, R, L, &structureInfo, labelsOutput_name);
-    }
-
-    /*---------------------------------------------------------------------
-    
-                            Memory Management
-
-    ------------------------------------------------------------------------*/
+    if (opts->poreSD)
+        poreSD_3D(opts, &info, P, 0);
 
     free(P);
-    free(E);
-    free(D);
-    free(InterfaceArray);
-    free(R);
-    free(L);
-    return 0;
-}
 
-
-int PoreSizeDist3D(bool debugMode)
-{
-    if (debugMode)
-    {
-        printf("------------------------------------------------\n\n");
-        printf("         Pore Size Distribution 3D\n");
-        printf("             (Debug Mode)\n\n");
-        printf("------------------------------------------------\n\n");
-    }
     return 0;
 }

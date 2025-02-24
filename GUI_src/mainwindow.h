@@ -4,7 +4,10 @@
 #include <QMainWindow>
 #include <QFile>
 #include <QFileDialog>
-#include <QtConcurrent>
+#include <QThread>
+#include <QMutex>
+#include <QWaitCondition>
+// #include "ED_PSD_CPU.hpp"
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -12,13 +15,38 @@ class MainWindow;
 }
 QT_END_NAMESPACE
 
+// worker thread class definition
+class Worker : public QThread
+{
+    Q_OBJECT
+public:
+    // constructor and destructor
+    Worker(QObject *parent = nullptr);
+    ~Worker();
+    // function call to run
+    void runSim(const QString string);
+signals:
+    void resultReady(const QString *result);
+    void enableButtons();
+    void disableButtons();
+protected:
+    void run() override;
+private:
+    QMutex mutex;
+    QWaitCondition condition;
+    bool restart = false;
+    bool abort = false;
+    QString foldername;
+};
+
+// main window class definition
+
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
-
 public:
     MainWindow(QWidget *parent = nullptr);
-    ~MainWindow();
+    // ~MainWindow();
 private slots:
     // 2D slots
     void updateFileText();
@@ -34,13 +62,19 @@ private slots:
     void saveInput3D();
     void clearText3D();
     // Run slots
+    void clearTextRun();
     void runSim();
     void findOpFolder();
     void handleFinish();
+    void disableButtons();
+    void enableButtons();  
 private:
+    void handleResult(const QString *string);
     Ui::MainWindow *ui;
-    QFutureWatcher<int> watcher;
-    QFuture<int> future;
+    Worker workerThread;
+    bool restart;
+    bool abort;
+    QString foldername;
 };
 
 #endif // MAINWINDOW_H

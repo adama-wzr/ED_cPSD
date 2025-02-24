@@ -1,8 +1,132 @@
 #include "mainwindow.h"
 #include "./ui_mainwindow.h"
 #include <QThread>
-#include <QtConcurrent>
 #include "ED_PSD_CPU.hpp"
+
+/*
+
+Worker Thread Class Implementation
+
+*/
+
+// constructor
+
+Worker::Worker(QObject *parent)
+    : QThread(parent)
+{
+}
+
+// destructor
+
+Worker::~Worker()
+{
+    mutex.lock();
+    abort = true;
+    condition.wakeOne();
+    mutex.unlock();
+    wait();
+}
+
+// runSim function
+
+void Worker::runSim(const QString string)
+{
+    QMutexLocker locker(&mutex);
+    this->foldername = string;
+    if(!isRunning())
+        start(LowPriority);
+    else
+    {
+        restart = true;
+        condition.wakeOne();
+    }
+    return;
+}
+
+// Re-implement run(), which is actually the function that does all of the work
+
+void Worker::run()
+{
+    QElapsedTimer timer;
+    forever
+    {
+        emit disableButtons();
+        options opts;
+        opts.folderName = (char *)malloc(sizeof(char)*1000);
+        mutex.lock();
+        strcpy(opts.folderName, foldername.toStdString().c_str());
+        mutex.unlock();
+
+        // now we can start the actual code run
+        QString started = "Operating Folder:";
+        emit resultReady(&started);
+        msleep(250);
+        QString test = QString(opts.folderName);
+        emit resultReady(&test);
+        msleep(250);
+        QString test2 = QString().asprintf("%1.3e", 1232845.4);
+        emit resultReady(&test2);
+        msleep(250);
+
+        // first step is to parse informations
+
+        char inputTextFile[100];
+        sprintf(inputTextFile, "input.txt");
+
+        bool fileFlag = false;
+
+        std::filesystem::path dir (opts.folderName);
+        std::filesystem::path file (inputTextFile);
+        std::filesystem::path full_path = dir / file;
+
+        if(FILE *file = fopen(full_path.generic_string().c_str(), "r")){
+            fclose(file);
+            fileFlag = true;
+        }else
+            fileFlag = false;
+
+        if (fileFlag == false)
+        {
+            QString fileError = "Could not locate input file, exiting now.";
+            emit resultReady(&fileError);
+            msleep(250);
+        }
+        else
+        {
+            readInput(inputTextFile, &opts);
+            // attempt to run simulation
+            QString simRunning = "Running c-PSD Simulation...";
+            emit resultReady(&simRunning);
+            msleep(250);
+            if (opts.nD == 2)
+            {
+                Sim2D(&opts);
+            }else if (opts.nD == 3)
+            {
+                Sim3D(&opts);
+            }
+        }
+
+        // re-enable buttons
+        enableButtons();
+        // abort statement to exit
+        if(abort)
+            return;
+
+        // work ended
+        mutex.lock();
+        if(!restart)
+            condition.wait(&mutex);
+        restart = false;
+        mutex.unlock();
+    }
+}
+
+/*
+
+Main Window Class Implementation
+
+*/
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -27,15 +151,31 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->saveButton3D, &QPushButton::clicked, this, &MainWindow::saveInput3D);
     // Find operating folder
     connect(ui->searchFolder, &QPushButton::clicked, this, &MainWindow::findOpFolder);
-    // connect future watcher with future
-    connect(&watcher, &QFutureWatcher<int>::finished, this, &MainWindow::handleFinish);
     // connect clear button 2D
     connect(ui->clearButton2D, &QPushButton::clicked, this, &MainWindow::clearText2D);
     // connect clear button 3D
     connect(ui->clearButton3D, &QPushButton::clicked, this, &MainWindow::clearText3D);
-    // Run code
+    // connect run button to run function
     connect(ui->runButton, &QPushButton::clicked, this, &MainWindow::runSim);
+    // connect clear button Runtime
+    connect(ui->clearRunButton, &QPushButton::clicked, this, &MainWindow::clearTextRun);
+    // result ready queued connection
+    connect(&workerThread, &Worker::resultReady, this, &MainWindow::handleResult);
+    // enable buttons
+    connect(&workerThread, &Worker::enableButtons, this, &MainWindow::enableButtons);
+    // disable buttons
+    connect(&workerThread, &Worker::disableButtons, this, &MainWindow::disableButtons);
 }
+
+
+// print results
+void MainWindow::handleResult(const QString *result)
+{
+    // qInfo() << result;
+    ui->runtimeMessages->append(*result);
+    return;
+}
+
 
 int simOpts(const QString &string)
 {
@@ -69,10 +209,10 @@ int simOpts(const QString &string)
 
     readInput(inputTextFile, &opts);
 
-    if(opts.verbose)
-    {
-        printOpts(&opts);
-    }
+    // if(opts.verbose)
+    // {
+    //     // printOpts(&opts);
+    // }
 
     if(opts.nD == 2)
     {
@@ -87,66 +227,92 @@ int simOpts(const QString &string)
     return 0;
 }
 
-// Run sim
-
-void MainWindow::runSim()
+void MainWindow::disableButtons()
 {
-
-    ui->runtimeMessages->setText("Attempting to run simulation.\n");
-
-    char* runtimeFolder = (char *)malloc(sizeof(char)*1000);
-
-    if (ui->opFolder->text().isEmpty())
-    {
-        ui->runtimeMessages->append("Error: no operating folder selected!\n");
-        free(runtimeFolder);
-        return;
-    }else
-    {
-        strcpy(runtimeFolder, ui->opFolder->text().toStdString().c_str());
-        ui->runtimeMessages->append("Folder: " + ui->opFolder->text() + "/\n");
-    }
-
-    ui->runtimeMessages->append("Simulation running, please wait.\n");
-
-    // disable buttons and text
-
+    // // disable buttons and text
     ui->runButton->setEnabled(false);
     ui->stopButton->setEnabled(true);
 
     ui->searchFolder->setEnabled(false);
     ui->opFolder->setReadOnly(true);
-
-    // QFutureWatcher<int> watcher;
-    // connect the watcher with handleFinish function
-    // connect(&watcher, &QFutureWatcher<int>::finished, this, &MainWindow::handleFinish);
-
-    // QFuture<int> future = QtConcurrent::run(simOpts, ui->opFolder->text());
-    future = QtConcurrent::run(simOpts, ui->opFolder->text());
-    // watch the concurrent execution
-    watcher.setFuture(future);
-
-    free(runtimeFolder);
     return;
 }
 
-void MainWindow::handleFinish()
+void MainWindow::enableButtons()
 {
-    int setStatus = future.result();
     ui->runButton->setEnabled(true);
     ui->stopButton->setEnabled(false);
 
     ui->searchFolder->setEnabled(true);
     ui->opFolder->setReadOnly(false);
+    return;
+}
 
-    if (setStatus == 0)
+// Run sim
+
+void MainWindow::runSim()
+{
+    if (ui->opFolder->text().isEmpty())
     {
-        ui->runtimeMessages->append("Execution Finished Successfully!");
-    }else
-    {
-        ui->runtimeMessages->append("Execution Finished with error.");
-        ui->runtimeMessages->append("Check command line output for more details.");
+        ui->runtimeMessages->append("Error: no operating folder selected!\n");
+        return;
     }
+    workerThread.runSim(ui->opFolder->text());
+    // ui->runtimeMessages->setText("Attempting to run simulation.\n");
+
+    // char* runtimeFolder = (char *)malloc(sizeof(char)*1000);
+
+    // if (ui->opFolder->text().isEmpty())
+    // {
+    //     ui->runtimeMessages->append("Error: no operating folder selected!\n");
+    //     free(runtimeFolder);
+    //     return;
+    // }else
+    // {
+    //     strcpy(runtimeFolder, ui->opFolder->text().toStdString().c_str());
+    //     ui->runtimeMessages->append("Folder: " + ui->opFolder->text() + "/\n");
+    // }
+
+    // ui->runtimeMessages->append("Simulation running, please wait.\n");
+
+    // // disable buttons and text
+
+    // ui->runButton->setEnabled(false);
+    // ui->stopButton->setEnabled(true);
+
+    // ui->searchFolder->setEnabled(false);
+    // ui->opFolder->setReadOnly(true);
+
+    // // QFutureWatcher<int> watcher;
+    // // connect the watcher with handleFinish function
+    // // connect(&watcher, &QFutureWatcher<int>::finished, this, &MainWindow::handleFinish);
+
+    // // QFuture<int> future = QtConcurrent::run(simOpts, ui->opFolder->text());
+    // future = QtConcurrent::run(simOpts, ui->opFolder->text());
+    // // watch the concurrent execution
+    // watcher.setFuture(future);
+
+    // free(runtimeFolder);
+    return;
+}
+
+void MainWindow::handleFinish()
+{
+    // int setStatus = future.result();
+    // ui->runButton->setEnabled(true);
+    // ui->stopButton->setEnabled(false);
+
+    // ui->searchFolder->setEnabled(true);
+    // ui->opFolder->setReadOnly(false);
+
+    // if (setStatus == 0)
+    // {
+    //     ui->runtimeMessages->append("Execution Finished Successfully!");
+    // }else
+    // {
+    //     ui->runtimeMessages->append("Execution Finished with error.");
+    //     ui->runtimeMessages->append("Check command line output for more details.");
+    // }
 
 
     return;
@@ -196,6 +362,12 @@ void MainWindow::saveInput3D()
 void MainWindow::clearText3D()
 {
     ui->textDisplay3D->clear();
+    return;
+}
+
+void MainWindow::clearTextRun()
+{
+    ui->runtimeMessages->clear();
     return;
 }
 
@@ -548,9 +720,9 @@ void MainWindow::updateFileText()
     return;
 }
 
-MainWindow::~MainWindow()
-{
-    delete ui;
-}
+// MainWindow::~MainWindow()
+// {
+//     delete ui;
+// }
 
 

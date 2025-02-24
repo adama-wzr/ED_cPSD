@@ -11,7 +11,6 @@
 #include <filesystem>
 
 #include <QDebug>
-
 // Load stb for reading jpg's
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -84,7 +83,6 @@ void printOpts(options *opts)
 
         Function will print user options to the command line.
     */
-
     qInfo("--------------------------------------\n\n");
     qInfo("c-PSD Simulation\n");
     qInfo("Current selected options:\n\n");
@@ -295,7 +293,6 @@ int readInput(char *inputFilename, options *opts)
             opts->stackSize = (int)tempD;
         }
     }
-    qInfo() << "It appears we read the file properly?";
     return 0;
 }
 
@@ -1889,11 +1886,15 @@ int Sim2D(options *opts)
     if (opts->inputType == 0)
     {
         if (readImg_2D(opts->inputFilename, &target_img, &imgInfo, opts) == 1)
+        {
             qInfo("Error, image has wrong number of channels\n");
+            return 1;
+        }
     }
     else
     {
         qInfo("Method not implemented yet!\n");
+        return 1;
     }
 
     // Create array to hold structure

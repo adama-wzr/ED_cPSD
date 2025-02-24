@@ -14,6 +14,7 @@ The [Documentation](#documentation) and [publications](#publications) below cont
 6. [Documentation](#documentation)
 7. [Acknowledgements](#acknowledgements)
 8. [Upcoming Changes](#upcoming-changes)
+9. [References](#references)
 
 # Requirements
 
@@ -28,3 +29,7 @@ The [Documentation](#documentation) and [publications](#publications) below cont
 # Acknowledgements
 
 # Upcoming Changes
+
+# References
+1. Meijster, A., Roerdink, J. B. T. M., & Hesselink, W. H. (n.d.). A General Algorithm for Computing Distance Transforms in Linear Time. In Computational Imaging and Vision (pp. 331–340). Kluwer Academic Publishers. https://doi.org/10.1007/0-306-47025-x_36
+2. 

@@ -282,6 +282,10 @@ int readInput(char *inputFilename, options *opts)
         {
             opts->stackSize = (int)tempD;
         }
+        else if (strcmp(tempC, "offsetR:") == 0)
+        {
+            opts->radOff = (int)tempD;
+        }
     }
     return 0;
 }
@@ -1248,7 +1252,7 @@ int partSD_2D(options *opts,
 
     pMeijster2D(B, EDT_D, info, 0); // 0 is the phase that will be dilated
 
-    int radius = 1;
+    int radius = opts->radOff;
 
     while (e_sum != 0 && radius <= opts->maxR)
     {
@@ -1295,9 +1299,9 @@ int partSD_2D(options *opts,
                 R[i] = radius;
         }
 
-        PDE_sum[(radius - 1) * 3 + 0] = p_sum;
-        PDE_sum[(radius - 1) * 3 + 1] = d_sum;
-        PDE_sum[(radius - 1) * 3 + 2] = e_sum;
+        PDE_sum[(radius - 1 - opts->radOff) * 3 + 0] = p_sum;
+        PDE_sum[(radius - 1 - opts->radOff) * 3 + 1] = d_sum;
+        PDE_sum[(radius - 1 - opts->radOff) * 3 + 2] = e_sum;
 
         // print verbose
 
@@ -1313,25 +1317,30 @@ int partSD_2D(options *opts,
     // calculate partSD and print to output file
 
     long int sum_removed = 0;
-    double *partRemoved = (double *)malloc(sizeof(double) * lastR);
+    double *partRemoved = (double *)malloc(sizeof(double) * (lastR - opts->radOff));
 
     // get particles removed at R = 1
 
     partRemoved[0] = PDE_sum[0 * 3 + 0] - PDE_sum[0 * 3 + 2];
     sum_removed += (int)partRemoved[0];
 
-    for (int i = 1; i < lastR; i++)
+    for (int i = 1; i < (lastR - opts->radOff); i++)
     {
         partRemoved[i] = PDE_sum[(i - 1) * 3 + 2] - PDE_sum[i * 3 + 2];
         sum_removed += (int)partRemoved[i];
     }
 
+    // correction for radius offset
+    int correction = 0;
+    if (opts->radOff != 0)
+        correction = opts->radOff - 1;
+
     FILE *partSD_OUT = fopen(opts->partSD_Out, "w+");
 
     fprintf(partSD_OUT, "r,p(r)\n");
-    for (int i = 0; i < lastR; i++)
+    for (int i = 0; i < (lastR - opts->radOff); i++)
     {
-        fprintf(partSD_OUT, "%d,%lf\n", i + 1, (double)partRemoved[i] / sum_removed);
+        fprintf(partSD_OUT, "%d,%lf\n", i + 1 + correction, (double)partRemoved[i] / sum_removed);
     }
 
     fclose(partSD_OUT);
@@ -1444,7 +1453,7 @@ int poreSD_2D(options *opts,
 
     pMeijster2D(B, EDT_D, info, 0); // 0 is the phase that will be dilated
 
-    int radius = 1;
+    int radius = opts->radOff;
 
     while (e_sum != 0 && radius < opts->maxR)
     {
@@ -1491,9 +1500,9 @@ int poreSD_2D(options *opts,
                 R[i] = radius;
         }
 
-        PDE_sum[(radius - 1) * 3 + 0] = p_sum;
-        PDE_sum[(radius - 1) * 3 + 1] = d_sum;
-        PDE_sum[(radius - 1) * 3 + 2] = e_sum;
+        PDE_sum[(radius - 1 - opts->radOff) * 3 + 0] = p_sum;
+        PDE_sum[(radius - 1 - opts->radOff) * 3 + 1] = d_sum;
+        PDE_sum[(radius - 1 - opts->radOff) * 3 + 2] = e_sum;
 
         // print to output file
 
@@ -1508,25 +1517,30 @@ int poreSD_2D(options *opts,
     // calculate partSD and print to output file
 
     long int sum_removed = 0;
-    double *poreRemoved = (double *)malloc(sizeof(double) * lastR);
+    double *poreRemoved = (double *)malloc(sizeof(double) * (lastR - opts->radOff));
 
     // get particles removed at R = 1
 
     poreRemoved[0] = PDE_sum[0 * 3 + 0] - PDE_sum[0 * 3 + 2];
     sum_removed += (int)poreRemoved[0];
 
-    for (int i = 1; i < lastR; i++)
+    for (int i = 1; i < (lastR - opts->radOff); i++)
     {
         poreRemoved[i] = PDE_sum[(i - 1) * 3 + 2] - PDE_sum[i * 3 + 2];
         sum_removed += (int)poreRemoved[i];
     }
 
+    // correction for radius offset
+    int correction = 0;
+    if (opts->radOff != 0)
+        correction = opts->radOff - 1;
+
     FILE *poreSD_OUT = fopen(opts->poreSD_Out, "w+");
 
     fprintf(poreSD_OUT, "r,p(r)\n");
-    for (int i = 0; i < lastR; i++)
+    for (int i = 0; i < (lastR - opts->radOff); i++)
     {
-        fprintf(poreSD_OUT, "%d,%lf\n", i + 1, (double)poreRemoved[i] / sum_removed);
+        fprintf(poreSD_OUT, "%d,%lf\n", i + 1 + correction, (double)poreRemoved[i] / sum_removed);
     }
 
     fclose(poreSD_OUT);
@@ -1639,7 +1653,7 @@ int partSD_3D(options *opts,
 
     pMeijster3D(B, EDT_D, info, 0); // 0 is the phase that will be dilated
 
-    int radius = 1;
+    int radius = opts->radOff;
 
     // Main Loop
 
@@ -1691,9 +1705,9 @@ int partSD_3D(options *opts,
                 R[i] = radius;
         }
 
-        PDE_sum[(radius - 1) * 3 + 0] = p_sum;
-        PDE_sum[(radius - 1) * 3 + 1] = d_sum;
-        PDE_sum[(radius - 1) * 3 + 2] = e_sum;
+        PDE_sum[(radius - 1 - opts->radOff) * 3 + 0] = p_sum;
+        PDE_sum[(radius - 1 - opts->radOff) * 3 + 1] = d_sum;
+        PDE_sum[(radius - 1 - opts->radOff) * 3 + 2] = e_sum;
 
         // print verbose
 
@@ -1708,28 +1722,31 @@ int partSD_3D(options *opts,
 
     // calculate partSD and print to output file
 
-    // calculate partSD and print to output file
-
     long int sum_removed = 0;
-    double *partRemoved = (double *)malloc(sizeof(double) * lastR);
+    double *partRemoved = (double *)malloc(sizeof(double) * (lastR - opts->radOff));
 
     // get particles removed at R = 1
 
     partRemoved[0] = PDE_sum[0 * 3 + 0] - PDE_sum[0 * 3 + 2];
     sum_removed += (int)partRemoved[0];
 
-    for (int i = 1; i < lastR; i++)
+    for (int i = 1; i < (lastR - opts->radOff); i++)
     {
         partRemoved[i] = PDE_sum[(i - 1) * 3 + 2] - PDE_sum[i * 3 + 2];
         sum_removed += (int)partRemoved[i];
     }
 
+    // correction for radius offset
+    int correction = 0;
+    if (opts->radOff != 0)
+        correction = opts->radOff - 1;
+
     FILE *partSD_OUT = fopen(opts->partSD_Out, "w+");
 
     fprintf(partSD_OUT, "r,p(r)\n");
-    for (int i = 0; i < lastR; i++)
+    for (int i = 0; i < (lastR - opts->radOff); i++)
     {
-        fprintf(partSD_OUT, "%d,%lf\n", i + 1, (double)partRemoved[i] / sum_removed);
+        fprintf(partSD_OUT, "%d,%lf\n", i + 1 + correction, (double)partRemoved[i] / sum_removed);
     }
 
     fclose(partSD_OUT);
@@ -1842,7 +1859,7 @@ int poreSD_3D(options *opts,
 
     pMeijster3D(B, EDT_D, info, 0); // 0 is the phase that will be dilated
 
-    int radius = 1;
+    int radius = opts->radOff;
 
     // Main Loop
 
@@ -1894,9 +1911,9 @@ int poreSD_3D(options *opts,
                 R[i] = radius;
         }
 
-        PDE_sum[(radius - 1) * 3 + 0] = p_sum;
-        PDE_sum[(radius - 1) * 3 + 1] = d_sum;
-        PDE_sum[(radius - 1) * 3 + 2] = e_sum;
+        PDE_sum[(radius - 1 - opts->radOff) * 3 + 0] = p_sum;
+        PDE_sum[(radius - 1 - opts->radOff) * 3 + 1] = d_sum;
+        PDE_sum[(radius - 1 - opts->radOff) * 3 + 2] = e_sum;
 
         // print verbose
 
@@ -1912,25 +1929,31 @@ int poreSD_3D(options *opts,
     // calculate partSD and print to output file
 
     long int sum_removed = 0;
-    double *partRemoved = (double *)malloc(sizeof(double) * lastR);
+    double *partRemoved = (double *)malloc(sizeof(double) * (lastR - opts->radOff));
 
     // get particles removed at R = 1
 
     partRemoved[0] = PDE_sum[0 * 3 + 0] - PDE_sum[0 * 3 + 2];
     sum_removed += (int)partRemoved[0];
 
-    for (int i = 1; i < lastR; i++)
+    for (int i = 1; i < (lastR - opts->radOff); i++)
     {
         partRemoved[i] = PDE_sum[(i - 1) * 3 + 2] - PDE_sum[i * 3 + 2];
         sum_removed += (int)partRemoved[i];
     }
 
+    // add correction for radius offset
+
+    int correction = 0;
+    if (opts->radOff != 0)
+        correction = opts->radOff - 1;
+
     FILE *partSD_OUT = fopen(opts->poreSD_Out, "w+");
 
     fprintf(partSD_OUT, "r,p(r)\n");
-    for (int i = 0; i < lastR; i++)
+    for (int i = 0; i < (lastR - opts->radOff); i++)
     {
-        fprintf(partSD_OUT, "%d,%lf\n", i + 1, (double)partRemoved[i] / sum_removed);
+        fprintf(partSD_OUT, "%d,%lf\n", i + 1 + correction, (double)partRemoved[i] / sum_removed);
     }
 
     fclose(partSD_OUT);

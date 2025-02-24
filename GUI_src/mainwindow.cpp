@@ -50,6 +50,7 @@ void Worker::run()
     QElapsedTimer timer;
     forever
     {
+        emit disableButtons();
         options opts;
         opts.folderName = (char *)malloc(sizeof(char)*1000);
         mutex.lock();
@@ -59,10 +60,13 @@ void Worker::run()
         // now we can start the actual code run
         QString started = "Operating Folder:";
         emit resultReady(&started);
+        msleep(250);
         QString test = QString(opts.folderName);
         emit resultReady(&test);
+        msleep(250);
         QString test2 = QString().asprintf("%1.3e", 1232845.4);
         emit resultReady(&test2);
+        msleep(250);
 
         // first step is to parse informations
 
@@ -81,24 +85,33 @@ void Worker::run()
         }else
             fileFlag = false;
 
-        if (!fileFlag)
+        if (fileFlag == false)
         {
             QString fileError = "Could not locate input file, exiting now.";
             emit resultReady(&fileError);
+            msleep(250);
         }
         else
         {
             readInput(inputTextFile, &opts);
             // attempt to run simulation
-            if (opts.verbose)
-                printOpts(&opts);
+            QString simRunning = "Running c-PSD Simulation...";
+            emit resultReady(&simRunning);
+            msleep(250);
+            if (opts.nD == 2)
+            {
+                Sim2D(&opts);
+            }else if (opts.nD == 3)
+            {
+                Sim3D(&opts);
+            }
         }
 
+        // re-enable buttons
+        enableButtons();
+        // abort statement to exit
         if(abort)
             return;
-
-
-
 
         // work ended
         mutex.lock();
@@ -148,6 +161,10 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->clearRunButton, &QPushButton::clicked, this, &MainWindow::clearTextRun);
     // result ready queued connection
     connect(&workerThread, &Worker::resultReady, this, &MainWindow::handleResult);
+    // enable buttons
+    connect(&workerThread, &Worker::enableButtons, this, &MainWindow::enableButtons);
+    // disable buttons
+    connect(&workerThread, &Worker::disableButtons, this, &MainWindow::disableButtons);
 }
 
 

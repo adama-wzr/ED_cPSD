@@ -11,7 +11,6 @@
 #include <filesystem>
 
 #include <QDebug>
-#include "mainwindow.h"
 // Load stb for reading jpg's
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -1887,11 +1886,15 @@ int Sim2D(options *opts)
     if (opts->inputType == 0)
     {
         if (readImg_2D(opts->inputFilename, &target_img, &imgInfo, opts) == 1)
+        {
             qInfo("Error, image has wrong number of channels\n");
+            return 1;
+        }
     }
     else
     {
         qInfo("Method not implemented yet!\n");
+        return 1;
     }
 
     // Create array to hold structure

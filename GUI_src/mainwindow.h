@@ -7,6 +7,7 @@
 #include <QThread>
 #include <QMutex>
 #include <QWaitCondition>
+// #include "ED_PSD_CPU.hpp"
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -26,6 +27,8 @@ public:
     void runSim(const QString string);
 signals:
     void resultReady(const QString *result);
+    void enableButtons();
+    void disableButtons();
 protected:
     void run() override;
 private:

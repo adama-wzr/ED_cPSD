@@ -1842,7 +1842,7 @@ int poreSD_3D(options *opts,
     int *R;
     int *L;
 
-    if (opts->partLabel)
+    if (opts->poreLabel)
     {
         R = (int *)malloc(sizeof(int) * info->nElements);
         L = (int *)malloc(sizeof(int) * info->nElements);

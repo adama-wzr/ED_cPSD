@@ -141,6 +141,7 @@ void printOpts(options *opts)
 
     printf("Num. threads: %d\n", opts->nThreads);
     printf("Max. Scan Radius: %d\n", opts->maxR);
+    printf("Radius Offset: %d\n", opts->radOff);
 
     printf("--------------------------------------\n\n");
 
@@ -1252,7 +1253,15 @@ int partSD_2D(options *opts,
 
     pMeijster2D(B, EDT_D, info, 0); // 0 is the phase that will be dilated
 
-    int radius = opts->radOff;
+    int radius;
+
+    if(opts->radOff == 0)
+    {
+        radius = 1;
+    } else
+    {
+        radius = opts->radOff;
+    }
 
     while (e_sum != 0 && radius <= opts->maxR)
     {
@@ -1411,7 +1420,7 @@ int poreSD_2D(options *opts,
     int *R;
     int *L;
 
-    if (opts->partLabel)
+    if (opts->poreLabel)
     {
         R = (int *)malloc(sizeof(int) * info->nElements);
         L = (int *)malloc(sizeof(int) * info->nElements);
@@ -1453,7 +1462,15 @@ int poreSD_2D(options *opts,
 
     pMeijster2D(B, EDT_D, info, 0); // 0 is the phase that will be dilated
 
-    int radius = opts->radOff;
+    int radius = 1;
+
+    if(opts->radOff == 0)
+    {
+        radius = 1;
+    } else
+    {
+        radius = opts->radOff;
+    }
 
     while (e_sum != 0 && radius < opts->maxR)
     {
@@ -1653,7 +1670,15 @@ int partSD_3D(options *opts,
 
     pMeijster3D(B, EDT_D, info, 0); // 0 is the phase that will be dilated
 
-    int radius = opts->radOff;
+    int radius = 1;
+
+    if(opts->radOff == 0)
+    {
+        radius = 1;
+    } else
+    {
+        radius = opts->radOff;
+    }
 
     // Main Loop
 
@@ -1859,7 +1884,15 @@ int poreSD_3D(options *opts,
 
     pMeijster3D(B, EDT_D, info, 0); // 0 is the phase that will be dilated
 
-    int radius = opts->radOff;
+    int radius;
+
+    if(opts->radOff == 0)
+    {
+        radius = 1;
+    } else
+    {
+        radius = opts->radOff;
+    }
 
     // Main Loop
 

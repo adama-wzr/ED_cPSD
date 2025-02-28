@@ -50,7 +50,16 @@ Additionally, you may want to consider acknowledging other publications that use
 - Adam, A., Wang, F., & Li, X. (2022). Efficient reconstruction and validation of heterogeneous microstructures for energy applications. International Journal of Energy Research. https://doi.org/10.1002/er.8578
 
 # Authors
-
+- Main developer: Andre Adam (The University of Kansas)
+    - [ResearchGate](https://www.researchgate.net/profile/Andre-Adam-2)
+    - [GoogleScholar](https://scholar.google.com/citations?hl=en&user=aP_rDkMAAAAJ)
+    - [GitHub](https://github.com/adama-wzr)
+- Advisor: Dr. Xianglin Li (Washingtion University in St. Louis)
+    - [Website](https://xianglinli.wixsite.com/mysite)
+    - [GoogleScholar](https://scholar.google.com/citations?user=8y0Vd8cAAAAJ&hl=en)
+- Advisor: Dr. Guang Yang (Oak-Ridge National Laboratory)
+    - [Website](https://www.ornl.gov/staff-profile/guang-yang)
+    - [GoogleScholar](https://scholar.google.com/citations?user=Ph_5mDMAAAAJ&hl=en)   
 # Documentation
 
 # Acknowledgements

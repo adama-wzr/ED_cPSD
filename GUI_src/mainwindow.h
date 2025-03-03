@@ -7,7 +7,7 @@
 #include <QThread>
 #include <QMutex>
 #include <QWaitCondition>
-// #include "ED_PSD_CPU.hpp"
+#include "data_structs.hpp"
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -25,6 +25,27 @@ public:
     ~Worker();
     // function call to run
     void runSim(const QString string);
+    // Simulation related functions
+    int Sim2D_ui(options* opts);
+    int Sim3D_ui(options* opts);
+    // pore and part 2D
+    int pore2D_SD_ui(options *opts,
+                     sizeInfo2D *info,
+                     char *P,
+                     char POI);
+    int part2D_SD_ui(options *opts,
+                     sizeInfo2D *info,
+                     char *P,
+                     char POI);
+    // pore and part 3D
+    int part3D_SD_ui(options *opts,
+                     sizeInfo *info,
+                     char *P,
+                     int POI);
+    int pore3D_SD_ui(options *opts,
+                     sizeInfo *info,
+                     char *P,
+                     int POI);
 signals:
     void resultReady(const QString *result);
     void enableButtons();

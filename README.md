@@ -59,13 +59,17 @@ Additionally, you may want to consider acknowledging other publications that use
     - [GoogleScholar](https://scholar.google.com/citations?user=8y0Vd8cAAAAJ&hl=en)
 - Advisor: Dr. Guang Yang (Oak-Ridge National Laboratory)
     - [Website](https://www.ornl.gov/staff-profile/guang-yang)
-    - [GoogleScholar](https://scholar.google.com/citations?user=Ph_5mDMAAAAJ&hl=en)   
+    - [GoogleScholar](https://scholar.google.com/citations?user=Ph_5mDMAAAAJ&hl=en)
+- Co-Advisor: Dr. Huazhen Fang (University of Kansas)
+    - 
 # Documentation
 
 # Acknowledgements
+
+This work used Expanse(GPU)/Bridges2(CPU) at SDSC/PSC through allocations MAT210014 and MAT230071 from the Advanced Cyberinfrastructure Coordination Ecosystem: Services \& Support (ACCESS) program, which is supported by National Science Foundation grants 2138259, 2138286, 2138307, 2137603, and 2138296<sup>[[2]](https://doi.org/10.1145/3569951.3597559)</sup>.
 
 # Upcoming Changes
 
 # References
 1. Meijster, A., Roerdink, J. B. T. M., & Hesselink, W. H. (n.d.). A General Algorithm for Computing Distance Transforms in Linear Time. In Computational Imaging and Vision (pp. 331–340). Kluwer Academic Publishers. https://doi.org/10.1007/0-306-47025-x_36
-2. 
+2. Timothy J. Boerner, Stephen Deems, Thomas R. Furlani, Shelley L. Knuth, and John Towns. 2023. ACCESS: Advancing Innovation: NSF’s Advanced Cyberinfrastructure Coordination Ecosystem: Services & Support. “In Practice and Experience in Advanced Research Computing (PEARC ’23)”, July 23–27, 2023, Portland, OR, USA. ACM, New York, NY, USA, 4 pages. [https://doi.org/10.1145/3569951.3597559](https://doi.org/10.1145/3569951.3597559).

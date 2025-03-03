@@ -162,6 +162,124 @@ int Worker::Sim2D_ui(options *opts)
 
 int Worker::Sim3D_ui(options *opts)
 {
+    /*---------------------------------------------------------------------
+
+                            Read Input
+                                &
+                          Declare Arrays
+
+        Input mode flags:
+        - Flag = 0 means .csv file with x,y,z coordinates of the particles.
+        - Flag = 1 means stack of .jpg files
+    ------------------------------------------------------------------------*/
+
+    // Structs
+
+    sizeInfo info;
+
+    // define P
+
+    char *P;
+
+    // read by input type
+
+    if (opts->inputType == 0)
+    {
+        // Expected structure size
+
+        info.width = opts->width;
+        info.height = opts->height;
+        info.depth = opts->depth;
+        info.nElements = info.depth * info.width * info.height;
+
+        // set omp options
+
+        omp_set_num_threads(opts->nThreads);
+
+        // Declare and Define Phase array
+
+        P = (char *)malloc(sizeof(char) * info.nElements);
+
+        memset(P, 0, sizeof(char) * info.nElements);
+        // read csv
+        readCSV(opts->inputFilename, P, &info, opts);
+    }
+    else if (opts->inputType == 1)
+    {
+        // read one image to get size
+        info.depth = opts->stackSize;
+
+        unsigned char *target_practice;
+
+        char test_name[100];
+
+        sprintf(test_name, "%0*d.jpg", opts->LeadZero, 0);
+
+        int channel;
+
+        target_practice = stbi_load(test_name, &info.width, &info.height, &channel, 1);
+
+        free(target_practice);
+        // set size of P
+
+        info.nElements = info.width * info.height * info.depth;
+
+        P = (char *)malloc(sizeof(char) * info.nElements);
+
+        memset(P, 0, sizeof(char) * info.nElements);
+
+        // read stack onto P
+
+        readStack(P, opts);
+    }
+
+    if (restart)
+    {
+        QString restartMsg = "Stop button pressed, simulation interrupted.";
+        emit resultReady(&restartMsg);
+        msleep(250);
+        free(P);
+        return 1;
+    }
+
+    if (abort)
+        return 1;
+
+    // Perform selected simulations
+
+    int executionFlag = 0;
+
+    if (opts->partSD)
+    {
+        QString divider = "\n---------------------------------------------";
+        emit resultReady(&divider);
+        msleep(250);
+        executionFlag = part3D_SD_ui(opts, &info, P, 1);
+    }
+
+    if(executionFlag == 1)
+    {
+        free(P);
+        return 1;
+    }
+
+
+    if (opts->poreSD)
+    {
+        QString divider = "\n---------------------------------------------";
+        emit resultReady(&divider);
+        msleep(250);
+        executionFlag = pore3D_SD_ui(opts, &info, P, 0);
+    }
+
+    if(executionFlag == 1)
+    {
+        free(P);
+        return 1;
+    }
+
+    // memory management
+    free(P);
     return 0;
 }
 
@@ -620,6 +738,489 @@ int Worker::part2D_SD_ui(options *opts, sizeInfo2D *info, char *P, char POI)
     return 0;
 }
 
+int Worker::pore3D_SD_ui(options *opts, sizeInfo *info, char *P, int POI)
+{
+    /*
+        Function poreSD_3D:
+        Inputs:
+            - pointer to options struct
+            - pointer to structure info struct
+            - pointer to phase-array
+            - char phase of interest
+        Outputs:
+            - None.
+        Function will calculate pore size distribution of array P.
+    */
+
+    if (opts->verbose)
+    {
+        QString part3D_runMsg = "Pore-Size Distribution 3D:\n";
+        emit resultReady(&part3D_runMsg);
+        msleep(250);
+    }
+
+    // Loop variables
+
+    long int p_sum, d_sum, e_sum;
+
+    e_sum = 1; // have to initialize, otherwise loop won't start
+
+    // array for saving p, e, and d at different R's
+
+    // Index 0 = p, index 1 = d, index 2 = e
+
+    long int *PDE_sum = (long int *)malloc(sizeof(long int) * opts->maxR * 3);
+
+    memset(PDE_sum, 0, sizeof(long int) * opts->maxR * 3);
+
+    // Array for storing radii
+
+    int *R;
+    int *L;
+
+    if (opts->poreLabel)
+    {
+        R = (int *)malloc(sizeof(int) * info->nElements);
+        L = (int *)malloc(sizeof(int) * info->nElements);
+
+        for (int i = 0; i < info->nElements; i++)
+        {
+            R[i] = -1;
+            L[i] = -1;
+        }
+    }
+
+    // arrays for holding the EDM:
+
+    float *EDT_D = (float *)malloc(sizeof(float) * info->nElements);
+    float *EDT_E = (float *)malloc(sizeof(float) * info->nElements);
+
+    memset(EDT_D, 0, sizeof(float) * info->nElements);
+    memset(EDT_E, 0, sizeof(float) * info->nElements);
+
+    // arrays for erosion and dilation
+
+    bool *E = (bool *)malloc(sizeof(bool) * info->nElements);
+    bool *D = (bool *)malloc(sizeof(bool) * info->nElements);
+    bool *B = (bool *)malloc(sizeof(bool) * info->nElements);
+
+    memset(E, 0, sizeof(bool) * info->nElements);
+    memset(D, 0, sizeof(bool) * info->nElements);
+    memset(B, 0, sizeof(bool) * info->nElements);
+
+// If POI, bool = 1
+#pragma omp parallel for schedule(auto)
+    for (int i = 0; i < info->nElements; i++)
+    {
+        if (P[i] == POI)
+            B[i] = 1;
+    }
+
+    // EDT for dilation is a one time operation
+
+    pMeijster3D_debug(B, EDT_D, info, 0); // 0 is the phase that will be dilated
+
+    int radius;
+
+    if(opts->radOff == 0)
+    {
+        radius = 1;
+    } else
+    {
+        radius = opts->radOff;
+    }
+
+    // Main Loop
+
+    while (e_sum != 0 && radius <= opts->maxR)
+    {
+        if (restart)
+        {
+            QString restartMsg = "Stop button pressed, simulation interrupted.";
+            emit resultReady(&restartMsg);
+            msleep(250);
+
+            free(PDE_sum);
+            free(EDT_D);
+            free(EDT_E);
+
+            free(E);
+            free(B);
+            free(D);
+
+            if(opts->partLabel)
+            {
+                free(L);
+                free(R);
+            }
+
+            return 1;
+        }
+        // copy B into D (probably not necessary)
+
+        memcpy(D, B, sizeof(bool) * info->nElements);
+#pragma omp parallel for schedule(auto)
+        for (int i = 0; i < info->nElements; i++)
+        {
+            if (pow(EDT_D[i], 2) <= (float)radius * radius)
+                D[i] = 0;
+        }
+
+        // Copy D into E
+
+        memcpy(E, D, sizeof(bool) * info->nElements);
+
+        // Meijster in D
+
+        pMeijster3D_debug(D, EDT_E, info, 1);
+
+// Update E
+#pragma omp parallel for schedule(auto)
+        for (int i = 0; i < info->nElements; i++)
+        {
+            if (pow(EDT_E[i], 2) <= (float)radius * radius)
+                E[i] = 1;
+        }
+
+        // Quantify changes
+
+        e_sum = 0;
+        d_sum = 0;
+        p_sum = 0;
+
+#pragma omp parallel for reduction(+ : p_sum, d_sum, e_sum)
+        for (int i = 0; i < info->nElements; i++)
+        {
+            p_sum += B[i];
+            d_sum += D[i];
+            e_sum += E[i];
+
+            if (!opts->poreLabel)
+                continue;
+
+            if (B[i] - E[i] == 1 && R[i] == -1)
+                R[i] = radius;
+        }
+
+        PDE_sum[(radius - 1 - opts->radOff) * 3 + 0] = p_sum;
+        PDE_sum[(radius - 1 - opts->radOff) * 3 + 1] = d_sum;
+        PDE_sum[(radius - 1 - opts->radOff) * 3 + 2] = e_sum;
+
+        // print verbose
+
+        if (opts->verbose)
+        {
+            QString pore3D_runMsg = QString().asprintf("R = %d, P = %ld, E = %ld, D = %ld", radius, p_sum, e_sum, d_sum);
+            emit resultReady(&pore3D_runMsg);
+            msleep(250);
+        }
+
+        // increment radius
+        radius++;
+    }
+
+    int lastR = radius;
+
+    // calculate partSD and print to output file
+
+    long int sum_removed = 0;
+    double *partRemoved = (double *)malloc(sizeof(double) * (lastR - opts->radOff));
+
+    // get particles removed at R = 1
+
+    partRemoved[0] = PDE_sum[0 * 3 + 0] - PDE_sum[0 * 3 + 2];
+    sum_removed += (int)partRemoved[0];
+
+    for (int i = 1; i < (lastR - opts->radOff); i++)
+    {
+        partRemoved[i] = PDE_sum[(i - 1) * 3 + 2] - PDE_sum[i * 3 + 2];
+        sum_removed += (int)partRemoved[i];
+    }
+
+    // add correction for radius offset
+
+    int correction = 0;
+    if (opts->radOff != 0)
+        correction = opts->radOff - 1;
+
+    FILE *partSD_OUT = fopen(opts->poreSD_Out, "w+");
+
+    fprintf(partSD_OUT, "r,p(r)\n");
+    for (int i = 0; i < (lastR - opts->radOff); i++)
+    {
+        fprintf(partSD_OUT, "%d,%lf\n", i + 1 + correction, (double)partRemoved[i] / sum_removed);
+    }
+
+    fclose(partSD_OUT);
+
+    // partial memory management
+
+    free(partRemoved);
+    free(PDE_sum);
+
+    // Derive particle labels from R, if applicable
+
+    if (opts->poreLabel)
+    {
+        ParticleLabel3D(opts->radOff, lastR, R, L, info);
+        saveLabels3D(R, L, info,  opts->poreLabel_Out, opts);
+
+        free(R);
+        free(L);
+    }
+
+    // memory management
+
+    free(EDT_D);
+    free(EDT_E);
+
+    free(B);
+    free(E);
+    free(D);
+
+    return 0;
+}
+
+int Worker::part3D_SD_ui(options *opts, sizeInfo *info, char *P, int POI)
+{
+    /*
+        Function partSD_3D:
+        Inputs:
+            - pointer to options struct
+            - pointer to structure info struct
+            - pointer to phase-array
+            - char phase of interest
+        Outputs:
+            - None.
+        Function will calculate particle size distribution of array P.
+    */
+
+    if (opts->verbose)
+    {
+        QString part3D_runMsg = "Particle-Size Distribution 3D:\n";
+        emit resultReady(&part3D_runMsg);
+        msleep(250);
+    }
+    // Loop variables
+
+    long int p_sum, d_sum, e_sum;
+
+    e_sum = 1; // have to initialize, otherwise loop won't start
+
+    // array for saving p, e, and d at different R's
+
+    // Index 0 = p, index 1 = d, index 2 = e
+
+    long int *PDE_sum = (long int *)malloc(sizeof(long int) * opts->maxR * 3);
+
+    memset(PDE_sum, 0, sizeof(long int) * opts->maxR * 3);
+
+    // Array for storing radii
+
+    int *R;
+    int *L;
+
+    if (opts->partLabel)
+    {
+        R = (int *)malloc(sizeof(int) * info->nElements);
+        L = (int *)malloc(sizeof(int) * info->nElements);
+
+        for (int i = 0; i < info->nElements; i++)
+        {
+            R[i] = -1;
+            L[i] = -1;
+        }
+    }
+
+    // arrays for holding the EDM:
+
+    float *EDT_D = (float *)malloc(sizeof(float) * info->nElements);
+    float *EDT_E = (float *)malloc(sizeof(float) * info->nElements);
+
+    memset(EDT_D, 0, sizeof(float) * info->nElements);
+    memset(EDT_E, 0, sizeof(float) * info->nElements);
+
+    // arrays for erosion and dilation
+
+    bool *E = (bool *)malloc(sizeof(bool) * info->nElements);
+    bool *D = (bool *)malloc(sizeof(bool) * info->nElements);
+    bool *B = (bool *)malloc(sizeof(bool) * info->nElements);
+
+    memset(E, 0, sizeof(bool) * info->nElements);
+    memset(D, 0, sizeof(bool) * info->nElements);
+    memset(B, 0, sizeof(bool) * info->nElements);
+
+// If POI, bool = 1
+#pragma omp parallel for schedule(auto)
+    for (int i = 0; i < info->nElements; i++)
+    {
+        if (P[i] == POI)
+            B[i] = 1;
+    }
+
+    // EDT for dilation is a one time operation
+
+    pMeijster3D_debug(B, EDT_D, info, 0); // 0 is the phase that will be dilated
+
+    int radius = 1;
+
+    if(opts->radOff == 0)
+    {
+        radius = 1;
+    } else
+    {
+        radius = opts->radOff;
+    }
+
+    // Main Loop
+
+    while (e_sum != 0 && radius <= opts->maxR)
+    {
+        if (restart)
+        {
+            QString restartMsg = "Stop button pressed, simulation interrupted.";
+            emit resultReady(&restartMsg);
+            msleep(250);
+
+            free(PDE_sum);
+            free(EDT_D);
+            free(EDT_E);
+
+            free(E);
+            free(B);
+            free(D);
+
+            if(opts->partLabel)
+            {
+                free(L);
+                free(R);
+            }
+
+            return 1;
+        }
+        // copy P into D (probably not necessary)
+
+        memcpy(D, B, sizeof(bool) * info->nElements);
+#pragma omp parallel for schedule(auto)
+        for (int i = 0; i < info->nElements; i++)
+        {
+            if (pow(EDT_D[i], 2) <= (float)radius * radius)
+                D[i] = 0;
+        }
+
+        // Copy D into E
+
+        memcpy(E, D, sizeof(bool) * info->nElements);
+
+        // Meijster in D
+
+        pMeijster3D_debug(D, EDT_E, info, 1);
+
+// Update E
+#pragma omp parallel for schedule(auto)
+        for (int i = 0; i < info->nElements; i++)
+        {
+            if (pow(EDT_E[i], 2) <= (float)radius * radius)
+                E[i] = 1;
+        }
+
+        // Quantify changes
+
+        e_sum = 0;
+        d_sum = 0;
+        p_sum = 0;
+
+#pragma omp parallel for reduction(+ : p_sum, d_sum, e_sum)
+        for (int i = 0; i < info->nElements; i++)
+        {
+            p_sum += B[i];
+            d_sum += D[i];
+            e_sum += E[i];
+
+            if (!opts->partLabel)
+                continue;
+
+            if (B[i] - E[i] == 1 && R[i] == -1)
+                R[i] = radius;
+        }
+
+        PDE_sum[(radius - 1 - opts->radOff) * 3 + 0] = p_sum;
+        PDE_sum[(radius - 1 - opts->radOff) * 3 + 1] = d_sum;
+        PDE_sum[(radius - 1 - opts->radOff) * 3 + 2] = e_sum;
+
+        // print verbose
+
+        if (opts->verbose)
+        {
+            QString part3D_runMsg = QString().asprintf("R = %d, P = %ld, E = %ld, D = %ld", radius, p_sum, e_sum, d_sum);
+            emit resultReady(&part3D_runMsg);
+            msleep(250);
+        }
+
+        // increment radius
+        radius++;
+    }
+
+    int lastR = radius;
+
+    // calculate partSD and print to output file
+
+    long int sum_removed = 0;
+    double *partRemoved = (double *)malloc(sizeof(double) * (lastR - opts->radOff));
+
+    // get particles removed at R = 1
+
+    partRemoved[0] = PDE_sum[0 * 3 + 0] - PDE_sum[0 * 3 + 2];
+    sum_removed += (int)partRemoved[0];
+
+    for (int i = 1; i < (lastR - opts->radOff); i++)
+    {
+        partRemoved[i] = PDE_sum[(i - 1) * 3 + 2] - PDE_sum[i * 3 + 2];
+        sum_removed += (int)partRemoved[i];
+    }
+
+    // correction for radius offset
+    int correction = 0;
+    if (opts->radOff != 0)
+        correction = opts->radOff - 1;
+
+    FILE *partSD_OUT = fopen(opts->partSD_Out, "w+");
+
+    fprintf(partSD_OUT, "r,p(r)\n");
+    for (int i = 0; i < (lastR - opts->radOff); i++)
+    {
+        fprintf(partSD_OUT, "%d,%lf\n", i + 1 + correction, (double)partRemoved[i] / sum_removed);
+    }
+
+    fclose(partSD_OUT);
+
+    // partial memory management
+
+    free(partRemoved);
+    free(PDE_sum);
+
+    // Derive particle labels from R, if applicable
+
+    if (opts->partLabel)
+    {
+        ParticleLabel3D(opts->radOff, lastR, R, L, info);
+        saveLabels3D(R, L, info,  opts->partLabel_Out, opts);
+        free(R);
+        free(L);
+    }
+
+    // memory management
+
+    free(EDT_D);
+    free(EDT_E);
+
+    free(B);
+    free(E);
+    free(D);
+
+    return 0;
+}
+
 // Re-implement run(), which is actually the function that does all of the work
 
 void Worker::run()
@@ -682,7 +1283,7 @@ void Worker::run()
                 executionFlag = Sim2D_ui(&opts);
             }else if (opts.nD == 3)
             {
-                Sim3D(&opts);
+                executionFlag = Sim3D_ui(&opts);
             }
             if (executionFlag == 1)
             {

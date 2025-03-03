@@ -37,6 +37,15 @@ public:
                      sizeInfo2D *info,
                      char *P,
                      char POI);
+    // pore and part 3D
+    int part3D_SD_ui(options *opts,
+                     sizeInfo *info,
+                     char *P,
+                     int POI);
+    int pore3D_SD_ui(options *opts,
+                     sizeInfo *info,
+                     char *P,
+                     int POI);
 signals:
     void resultReady(const QString *result);
     void enableButtons();

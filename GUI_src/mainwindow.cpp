@@ -1301,7 +1301,11 @@ void Worker::run()
             }
         }
 
+        const auto elapsed = timer.elapsed();
 
+        QString elapsedTime = QString().asprintf("%lld seconds", elapsed/1000);
+        emit resultReady(&elapsedTime);
+        msleep(250);
         // re-enable buttons
         emit enableButtons();
         // abort statement to exit

@@ -64,9 +64,9 @@ void Worker::run()
         QString test = QString(opts.folderName);
         emit resultReady(&test);
         msleep(250);
-        QString test2 = QString().asprintf("%1.3e", 1232845.4);
-        emit resultReady(&test2);
-        msleep(250);
+        // QString test2 = QString().asprintf("%1.3e", 1232845.4);
+        // emit resultReady(&test2);
+        // msleep(250);
 
         // first step is to parse informations
 
@@ -106,9 +106,11 @@ void Worker::run()
                 Sim3D(&opts);
             }
         }
-
+        QString doneRunning = "Simulation Finished!";
+        emit resultReady(&doneRunning);
+        msleep(250);
         // re-enable buttons
-        enableButtons();
+        emit enableButtons();
         // abort statement to exit
         if(abort)
             return;
@@ -397,6 +399,8 @@ void MainWindow::togglePoreLabel2D()
     } else
     {
         ui->poreLabel->setCheckable(false);
+        ui->poreSD_Out->clear();
+        ui->poreLabel_Out->clear();
         ui->poreLabel_Out->setReadOnly(true);
         ui->poreSD_Out->setReadOnly(true);
     }
@@ -413,6 +417,8 @@ void MainWindow::togglePoreLabel3D()
     } else
     {
         ui->poreLabel_3D->setCheckable(false);
+        ui->poreLabel_Out3D->clear();
+        ui->poreSD_Out3D->clear();
         ui->poreLabel_Out3D->setReadOnly(true);
         ui->poreSD_Out3D->setReadOnly(true);
     }
@@ -429,6 +435,8 @@ void MainWindow::togglePartLabel2D()
     } else
     {
         ui->partLabel->setCheckable(false);
+        ui->partSD_Out->clear();
+        ui->partLabel_Out->clear();
         ui->partLabel_Out->setReadOnly(true);
         ui->partSD_Out->setReadOnly(true);
     }
@@ -437,7 +445,7 @@ void MainWindow::togglePartLabel2D()
 
 void MainWindow::togglePartLabel3D()
 {
-    if(ui->poreSD_3D->isChecked())
+    if(ui->partSD_3D->isChecked())
     {
         ui->partLabel_3D->setCheckable(true);
         ui->partLabel_Out3D->setReadOnly(false);
@@ -445,6 +453,8 @@ void MainWindow::togglePartLabel3D()
     } else
     {
         ui->partLabel_3D->setCheckable(false);
+        ui->partSD_Out3D->clear();
+        ui->partLabel_Out3D->clear();
         ui->partLabel_Out3D->setReadOnly(true);
         ui->partSD_Out3D->setReadOnly(true);
     }

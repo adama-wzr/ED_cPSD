@@ -22,45 +22,44 @@
 
 typedef struct
 {
-    int nD;
-    char *inputFilename;
-    char *poreSD_Out;
-    char *partSD_Out;
-    char *poreLabel_Out;
-    char *partLabel_Out;
-    char *readFolder;
-    char *saveFolder;
-    bool poreSD;
-    bool partSD;
-    bool poreLabel;
-    bool partLabel;
-    bool verbose;
-    int nThreads;
-    int height;
-    int width;
-    int depth;
-    char inputType;
-    bool batchFlag;
-    unsigned char TH;
-    int maxR;
-    int radOff;
-    int stackSize;
-    char LeadZero;
+    int nD;              // number of dimensions
+    char *inputFilename; // name of input structure
+    char *poreSD_Out;    // name of pore size distribution output
+    char *partSD_Out;    // name of particle size distribution output
+    char *poreLabel_Out; // name of pore labels output file
+    char *partLabel_Out; // name of particle labels output file
+    char *readFolder;    // folder name
+    char *saveFolder;    // name of save folder
+    bool poreSD;         // flag for calculating pore size distribution
+    bool partSD;         // flag for calculating particle size distribution
+    bool poreLabel;      // flag for calculating pore labels
+    bool partLabel;      // flag for calculating particle labels
+    bool verbose;        // flag for printing to command line
+    int nThreads;        // number of CPU threads to use
+    int height;          // domain height in number of pixels
+    int width;           // domain width in number of pixels
+    int depth;           // domain depth in number of pixels
+    char inputType;      // type of input expected
+    unsigned char TH;    // threshold for grayscale images
+    int maxR;            // max scan radius
+    int radOff;          // radius offset
+    int stackSize;       // stack size
+    char LeadZero;       // number of leading zeroes
 } options;
 
 typedef struct
 {
-    int width;
-    int height;
-    int depth;
-    long int nElements;
+    int width;          // width of the domain in pixels
+    int height;         // height of the domain in pixels
+    int depth;          // depth of the domain in pixels
+    long int nElements; // total number of elements in pixels
 } sizeInfo;
 
 typedef struct
 {
-    int width;
-    int height;
-    long int nElements;
+    int width;          // width of the domain in pixels
+    int height;         // height of the domain in pixels
+    long int nElements; // total number of elements in pixels
 } sizeInfo2D;
 
 /*
@@ -142,6 +141,7 @@ void printOpts(options *opts)
 
     printf("Num. threads: %d\n", opts->nThreads);
     printf("Max. Scan Radius: %d\n", opts->maxR);
+    printf("Radius Offset: %d\n", opts->radOff);
 
     printf("--------------------------------------\n\n");
 
@@ -174,7 +174,6 @@ int readInput(char *inputFilename, options *opts)
 
     opts->nThreads = 1;
     opts->verbose = true;
-    opts->batchFlag = false;
     opts->inputType = 0;
 
     opts->poreSD = false;
@@ -284,6 +283,10 @@ int readInput(char *inputFilename, options *opts)
         {
             opts->stackSize = (int)tempD;
         }
+        else if (strcmp(tempC, "offsetR:") == 0)
+        {
+            opts->radOff = (int)tempD;
+        }
     }
     return 0;
 }
@@ -292,6 +295,17 @@ int readCSV(char *target_name,
             char *P,
             sizeInfo *structureInfo)
 {
+    /*
+        Function readCSV:
+        Inputs:
+            - pointer to file name
+            - pointer to P, where structure will be stored
+            - pointer to sizeInfo struct.
+        Output:
+            - None
+
+        Function will read structure from csv file.
+    */
     // read data structure
 
     int height, width;
@@ -358,6 +372,17 @@ int readImg_2D(char *target_name,
                unsigned char **targetPtr,
                sizeInfo2D *imgInfo)
 {
+    /*
+        Function readImg_2D:
+        Inputs:
+            - pointer to file name
+            - double pointer to where structure will be stored
+            - pointer to sizeInfo2D struct.
+        Output:
+            - None
+
+        Function will read structure from jpg file.
+    */
     int channel;
 
     *targetPtr = stbi_load(target_name, &imgInfo->width, &imgInfo->height, &channel, 1);
@@ -373,6 +398,16 @@ int readImg_2D(char *target_name,
 int readStack(char *P,
               options *opts)
 {
+    /*
+        Function readStack:
+        Inputs:
+            - pointer to P, where structure will be stored
+            - pointer to options struct.
+        Output:
+            - None
+
+        Function will read structure from stack of jpg files.
+    */
     long int index;
 
     char imgName[1000];
@@ -427,6 +462,18 @@ int saveLabels2D(int *R,
                  sizeInfo2D *structureInfo,
                  char *filename)
 {
+    /*
+        Function saveLabels2D:
+        Inputs:
+            - pointer to R labels
+            - pointer to L labels
+            - pointer to sizeInfo2D struct
+            - pointer to output filename
+        Output:
+            - None
+
+        Function will save labels for this 2D simulation.
+    */
     // read data structure
     int width;
 
@@ -468,6 +515,18 @@ int saveLabels3D(int *R,
                  sizeInfo *structureInfo,
                  char *filename)
 {
+    /*
+        Function saveLabels3D:
+        Inputs:
+            - pointer to R labels
+            - pointer to L labels
+            - pointer to sizeInfo struct
+            - pointer to output filename
+        Output:
+            - None
+
+        Function will save labels for this 3D simulation.
+    */
     // read data structure
     int height, width;
 
@@ -511,6 +570,9 @@ int f_EDT_2D(int *g,
              int x,
              int i)
 {
+    /*
+        Function calculates "f" from the original Meijster Algorithm.
+    */
     int f = (x - i) * (x - i) + g[g_index] * g[g_index];
     return f;
 }
@@ -521,12 +583,27 @@ int Sep_EDT_2D(int *g,
                int g_index_i,
                int g_index_u)
 {
+    /*
+        Function calculates "Sep" from the original Meijster Algorithm.
+    */
     int Sep = (u * u - i * i + g[g_index_u] * g[g_index_u] - g[g_index_i] * g[g_index_i]) / (2 * (u - i));
     return Sep;
 }
 
 int pass12_Global(bool *target_arr, float *EDT, int j, int k, int width, int height, int depth, int primaryPhase)
 {
+    /*
+        Function pass12_Global:
+        Inputs:
+            - pointer to target_arr, where structure is held
+            - pointer to EDT, where the EDT is held
+            - j and k give column and slice numbers for row scanning
+            - width, height, and depth are the dimensions in number of pixels.
+            - the primary phase is the phase relative to which we calculate the distances.
+        Outputs:
+            - None.
+        This function calculates Pass 1 and 2 according to Meijster algorithm.
+    */
     int stride = width;
     int offset = k * (width * height) + j;
 
@@ -554,6 +631,19 @@ int pass12_Global(bool *target_arr, float *EDT, int j, int k, int width, int hei
 
 int pass34_Global(float *EDT, float *EDT_temp, int scanLength, int stride, int *s, int *t)
 {
+    /*
+        Function pass34_Global:
+        Inputs:
+            - pointer to EDT, where the EDT is held
+            - pointer to EDT_temp, where the old static EDT is held.
+            - scan length gives number of pixels to scan
+            - stride gives the actual memory stride for scanning single directions
+            - pointers to s and t are necessary according to Meijster algorithm
+        Outputs:
+            - None.
+        This function calculates Pass 3 and 4 according to Meijster algorithm. This is repeated (5 and 6)
+        for 3D structures.
+    */
     for (int i = 0; i < scanLength; i++)
         EDT_temp[i] = EDT[i * stride];
 
@@ -602,6 +692,18 @@ int pass34_Global(float *EDT, float *EDT_temp, int scanLength, int stride, int *
 
 int pass12_2D(bool *target_arr, int *g, int height, int width, int offset, int primaryPhase)
 {
+    /*
+        Function pass12_2D:
+        Inputs:
+            - pointer to target_arr, where structure is held
+            - pointer to g, where the EDT is held
+            - width and height are the dimensions in number of pixels.
+            - offset will dicated which column we are performing the current scan.
+            - the primary phase is the phase relative to which we calculate the distances.
+        Outputs:
+            - None.
+        This function calculates Pass 1 and 2 according to Meijster algorithm for the 2D case.
+    */
     // scan 1
     if (target_arr[offset] == primaryPhase)
         g[offset] = 0;
@@ -626,6 +728,18 @@ int pass12_2D(bool *target_arr, int *g, int height, int width, int offset, int p
 
 int pass34_2D(int *g, int *targetEDT, int width, int offset, int *s, int *t)
 {
+    /*
+        Function pass34_2D:
+        Inputs:
+            - pointer to g, where the previous EDT is held
+            - pointer to targetEDT, where the new EDT will go.
+            - width is the dimensions in number of pixels.
+            - offset will dicated which row we are performing the current scan.
+            - s and t are necessary for the Meijster algorithm.
+        Outputs:
+            - None.
+        This function calculates Pass 3 and 4 according to Meijster algorithm for the 2D case.
+    */
     // initialize local s and t
     int q = 0;
     int w = 0;
@@ -671,9 +785,15 @@ void pMeijster2D(bool *targetArray,
                  int primaryPhase)
 {
     /*
-        The primary phase determines which phase will be used as the anchor to calculate the EDT.
-        In other words, a primary phase of 1 means the EDT will be calculated on phase 0, and the
-        distances are relative to phase 1.
+        Function pMeijster2D:
+        Inputs:
+            - pointer to targetArray, where the structure is held
+            - pointer to targetEDT, where the EDT will go.
+            - pointer to sizeInfo2D sruct
+            - primaryPhase dictates the phase which the EDT will be calculated in relation to.
+        Outputs:
+            - None.
+        This function calculates the EDT in 2D using parallel computing.
     */
     int height, width;
 
@@ -713,15 +833,21 @@ void pMeijster2D(bool *targetArray,
     return;
 }
 
-void pMeijster3D_debug(bool *targetArray,
-                       float *targetEDT,
-                       sizeInfo *structureInfo,
-                       int primaryPhase)
+void pMeijster3D(bool *targetArray,
+                 float *targetEDT,
+                 sizeInfo *structureInfo,
+                 int primaryPhase)
 {
     /*
-        The primary phase determines which phase will be used as the anchor to calculate the EDT.
-        In other words, a primary phase of 1 means the EDT will be calculated on phase 0, and the
-        distances are relative to phase 1.
+        Function pMeijster3D:
+        Inputs:
+            - pointer to targetArray, where the structure is held
+            - pointer to targetEDT, where the EDT will go.
+            - pointer to sizeInfo sruct
+            - primaryPhase dictates the phase which the EDT will be calculated in relation to.
+        Outputs:
+            - None.
+        This function calculates the EDT in 3D using parallel computing.
     */
     int height, width, depth;
 
@@ -793,6 +919,18 @@ void ParticleLabel2D(int rMin,
                      int *L,
                      sizeInfo2D *structureInfo)
 {
+    /*
+        Function ParticleLabel2D:
+        Inputs:
+            - rMin
+            - rMax
+            - pointer to R labels (already calculated)
+            - pointer to L (will be calculated in this function)
+            - pointer to sizeInfo2D struct
+        Outputs:
+            - None.
+        This function will attempt labelling all of the particles.
+    */
 
     // open list
 
@@ -895,7 +1033,18 @@ void ParticleLabel3D(int rMin,
                      int *L,
                      sizeInfo *structureInfo)
 {
-
+    /*
+        Function ParticleLabel3D:
+        Inputs:
+            - rMin
+            - rMax
+            - pointer to R labels (already calculated)
+            - pointer to L (will be calculated in this function)
+            - pointer to sizeInfo struct
+        Outputs:
+            - None.
+        This function will attempt labelling all of the particles.
+    */
     // open list
 
     std::list<long int> oList;
@@ -1031,6 +1180,9 @@ int partSD_2D(options *opts,
             - pointer to structure info struct
             - pointer to phase-array
             - char phase of interest
+        Outputs:
+            - None.
+        Function will calculate particle size distribution of array P.
     */
 
     if (opts->verbose)
@@ -1101,7 +1253,15 @@ int partSD_2D(options *opts,
 
     pMeijster2D(B, EDT_D, info, 0); // 0 is the phase that will be dilated
 
-    int radius = 1;
+    int radius;
+
+    if(opts->radOff == 0)
+    {
+        radius = 1;
+    } else
+    {
+        radius = opts->radOff;
+    }
 
     while (e_sum != 0 && radius <= opts->maxR)
     {
@@ -1148,9 +1308,9 @@ int partSD_2D(options *opts,
                 R[i] = radius;
         }
 
-        PDE_sum[(radius - 1) * 3 + 0] = p_sum;
-        PDE_sum[(radius - 1) * 3 + 1] = d_sum;
-        PDE_sum[(radius - 1) * 3 + 2] = e_sum;
+        PDE_sum[(radius - 1 - opts->radOff) * 3 + 0] = p_sum;
+        PDE_sum[(radius - 1 - opts->radOff) * 3 + 1] = d_sum;
+        PDE_sum[(radius - 1 - opts->radOff) * 3 + 2] = e_sum;
 
         // print verbose
 
@@ -1166,25 +1326,30 @@ int partSD_2D(options *opts,
     // calculate partSD and print to output file
 
     long int sum_removed = 0;
-    double *partRemoved = (double *)malloc(sizeof(double) * lastR);
+    double *partRemoved = (double *)malloc(sizeof(double) * (lastR - opts->radOff));
 
     // get particles removed at R = 1
 
     partRemoved[0] = PDE_sum[0 * 3 + 0] - PDE_sum[0 * 3 + 2];
     sum_removed += (int)partRemoved[0];
 
-    for (int i = 1; i < lastR; i++)
+    for (int i = 1; i < (lastR - opts->radOff); i++)
     {
         partRemoved[i] = PDE_sum[(i - 1) * 3 + 2] - PDE_sum[i * 3 + 2];
         sum_removed += (int)partRemoved[i];
     }
 
+    // correction for radius offset
+    int correction = 0;
+    if (opts->radOff != 0)
+        correction = opts->radOff - 1;
+
     FILE *partSD_OUT = fopen(opts->partSD_Out, "w+");
 
     fprintf(partSD_OUT, "r,p(r)\n");
-    for (int i = 0; i < lastR; i++)
+    for (int i = 0; i < (lastR - opts->radOff); i++)
     {
-        fprintf(partSD_OUT, "%d,%lf\n", i + 1, (double)partRemoved[i] / sum_removed);
+        fprintf(partSD_OUT, "%d,%lf\n", i + 1 + correction, (double)partRemoved[i] / sum_removed);
     }
 
     fclose(partSD_OUT);
@@ -1228,6 +1393,9 @@ int poreSD_2D(options *opts,
             - pointer to structure info struct
             - pointer to phase-array
             - char phase of interest
+        Outputs:
+            - None.
+        Function will calculate pore size distribution of array P.
     */
 
     if (opts->verbose)
@@ -1252,7 +1420,7 @@ int poreSD_2D(options *opts,
     int *R;
     int *L;
 
-    if (opts->partLabel)
+    if (opts->poreLabel)
     {
         R = (int *)malloc(sizeof(int) * info->nElements);
         L = (int *)malloc(sizeof(int) * info->nElements);
@@ -1295,6 +1463,14 @@ int poreSD_2D(options *opts,
     pMeijster2D(B, EDT_D, info, 0); // 0 is the phase that will be dilated
 
     int radius = 1;
+
+    if(opts->radOff == 0)
+    {
+        radius = 1;
+    } else
+    {
+        radius = opts->radOff;
+    }
 
     while (e_sum != 0 && radius < opts->maxR)
     {
@@ -1341,9 +1517,9 @@ int poreSD_2D(options *opts,
                 R[i] = radius;
         }
 
-        PDE_sum[(radius - 1) * 3 + 0] = p_sum;
-        PDE_sum[(radius - 1) * 3 + 1] = d_sum;
-        PDE_sum[(radius - 1) * 3 + 2] = e_sum;
+        PDE_sum[(radius - 1 - opts->radOff) * 3 + 0] = p_sum;
+        PDE_sum[(radius - 1 - opts->radOff) * 3 + 1] = d_sum;
+        PDE_sum[(radius - 1 - opts->radOff) * 3 + 2] = e_sum;
 
         // print to output file
 
@@ -1358,25 +1534,30 @@ int poreSD_2D(options *opts,
     // calculate partSD and print to output file
 
     long int sum_removed = 0;
-    double *poreRemoved = (double *)malloc(sizeof(double) * lastR);
+    double *poreRemoved = (double *)malloc(sizeof(double) * (lastR - opts->radOff));
 
     // get particles removed at R = 1
 
     poreRemoved[0] = PDE_sum[0 * 3 + 0] - PDE_sum[0 * 3 + 2];
     sum_removed += (int)poreRemoved[0];
 
-    for (int i = 1; i < lastR; i++)
+    for (int i = 1; i < (lastR - opts->radOff); i++)
     {
         poreRemoved[i] = PDE_sum[(i - 1) * 3 + 2] - PDE_sum[i * 3 + 2];
         sum_removed += (int)poreRemoved[i];
     }
 
+    // correction for radius offset
+    int correction = 0;
+    if (opts->radOff != 0)
+        correction = opts->radOff - 1;
+
     FILE *poreSD_OUT = fopen(opts->poreSD_Out, "w+");
 
     fprintf(poreSD_OUT, "r,p(r)\n");
-    for (int i = 0; i < lastR; i++)
+    for (int i = 0; i < (lastR - opts->radOff); i++)
     {
-        fprintf(poreSD_OUT, "%d,%lf\n", i + 1, (double)poreRemoved[i] / sum_removed);
+        fprintf(poreSD_OUT, "%d,%lf\n", i + 1 + correction, (double)poreRemoved[i] / sum_removed);
     }
 
     fclose(poreSD_OUT);
@@ -1420,6 +1601,9 @@ int partSD_3D(options *opts,
             - pointer to structure info struct
             - pointer to phase-array
             - char phase of interest
+        Outputs:
+            - None.
+        Function will calculate particle size distribution of array P.
     */
 
     if (opts->verbose)
@@ -1484,9 +1668,17 @@ int partSD_3D(options *opts,
 
     // EDT for dilation is a one time operation
 
-    pMeijster3D_debug(B, EDT_D, info, 0); // 0 is the phase that will be dilated
+    pMeijster3D(B, EDT_D, info, 0); // 0 is the phase that will be dilated
 
     int radius = 1;
+
+    if(opts->radOff == 0)
+    {
+        radius = 1;
+    } else
+    {
+        radius = opts->radOff;
+    }
 
     // Main Loop
 
@@ -1508,7 +1700,7 @@ int partSD_3D(options *opts,
 
         // Meijster in D
 
-        pMeijster3D_debug(D, EDT_E, info, 1);
+        pMeijster3D(D, EDT_E, info, 1);
 
 // Update E
 #pragma omp parallel for schedule(auto)
@@ -1538,9 +1730,9 @@ int partSD_3D(options *opts,
                 R[i] = radius;
         }
 
-        PDE_sum[(radius - 1) * 3 + 0] = p_sum;
-        PDE_sum[(radius - 1) * 3 + 1] = d_sum;
-        PDE_sum[(radius - 1) * 3 + 2] = e_sum;
+        PDE_sum[(radius - 1 - opts->radOff) * 3 + 0] = p_sum;
+        PDE_sum[(radius - 1 - opts->radOff) * 3 + 1] = d_sum;
+        PDE_sum[(radius - 1 - opts->radOff) * 3 + 2] = e_sum;
 
         // print verbose
 
@@ -1555,28 +1747,31 @@ int partSD_3D(options *opts,
 
     // calculate partSD and print to output file
 
-    // calculate partSD and print to output file
-
     long int sum_removed = 0;
-    double *partRemoved = (double *)malloc(sizeof(double) * lastR);
+    double *partRemoved = (double *)malloc(sizeof(double) * (lastR - opts->radOff));
 
     // get particles removed at R = 1
 
     partRemoved[0] = PDE_sum[0 * 3 + 0] - PDE_sum[0 * 3 + 2];
     sum_removed += (int)partRemoved[0];
 
-    for (int i = 1; i < lastR; i++)
+    for (int i = 1; i < (lastR - opts->radOff); i++)
     {
         partRemoved[i] = PDE_sum[(i - 1) * 3 + 2] - PDE_sum[i * 3 + 2];
         sum_removed += (int)partRemoved[i];
     }
 
+    // correction for radius offset
+    int correction = 0;
+    if (opts->radOff != 0)
+        correction = opts->radOff - 1;
+
     FILE *partSD_OUT = fopen(opts->partSD_Out, "w+");
 
     fprintf(partSD_OUT, "r,p(r)\n");
-    for (int i = 0; i < lastR; i++)
+    for (int i = 0; i < (lastR - opts->radOff); i++)
     {
-        fprintf(partSD_OUT, "%d,%lf\n", i + 1, (double)partRemoved[i] / sum_removed);
+        fprintf(partSD_OUT, "%d,%lf\n", i + 1 + correction, (double)partRemoved[i] / sum_removed);
     }
 
     fclose(partSD_OUT);
@@ -1620,6 +1815,9 @@ int poreSD_3D(options *opts,
             - pointer to structure info struct
             - pointer to phase-array
             - char phase of interest
+        Outputs:
+            - None.
+        Function will calculate pore size distribution of array P.
     */
 
     if (opts->verbose)
@@ -1644,7 +1842,7 @@ int poreSD_3D(options *opts,
     int *R;
     int *L;
 
-    if (opts->partLabel)
+    if (opts->poreLabel)
     {
         R = (int *)malloc(sizeof(int) * info->nElements);
         L = (int *)malloc(sizeof(int) * info->nElements);
@@ -1684,9 +1882,17 @@ int poreSD_3D(options *opts,
 
     // EDT for dilation is a one time operation
 
-    pMeijster3D_debug(B, EDT_D, info, 0); // 0 is the phase that will be dilated
+    pMeijster3D(B, EDT_D, info, 0); // 0 is the phase that will be dilated
 
-    int radius = 1;
+    int radius;
+
+    if(opts->radOff == 0)
+    {
+        radius = 1;
+    } else
+    {
+        radius = opts->radOff;
+    }
 
     // Main Loop
 
@@ -1708,7 +1914,7 @@ int poreSD_3D(options *opts,
 
         // Meijster in D
 
-        pMeijster3D_debug(D, EDT_E, info, 1);
+        pMeijster3D(D, EDT_E, info, 1);
 
 // Update E
 #pragma omp parallel for schedule(auto)
@@ -1738,9 +1944,9 @@ int poreSD_3D(options *opts,
                 R[i] = radius;
         }
 
-        PDE_sum[(radius - 1) * 3 + 0] = p_sum;
-        PDE_sum[(radius - 1) * 3 + 1] = d_sum;
-        PDE_sum[(radius - 1) * 3 + 2] = e_sum;
+        PDE_sum[(radius - 1 - opts->radOff) * 3 + 0] = p_sum;
+        PDE_sum[(radius - 1 - opts->radOff) * 3 + 1] = d_sum;
+        PDE_sum[(radius - 1 - opts->radOff) * 3 + 2] = e_sum;
 
         // print verbose
 
@@ -1756,25 +1962,31 @@ int poreSD_3D(options *opts,
     // calculate partSD and print to output file
 
     long int sum_removed = 0;
-    double *partRemoved = (double *)malloc(sizeof(double) * lastR);
+    double *partRemoved = (double *)malloc(sizeof(double) * (lastR - opts->radOff));
 
     // get particles removed at R = 1
 
     partRemoved[0] = PDE_sum[0 * 3 + 0] - PDE_sum[0 * 3 + 2];
     sum_removed += (int)partRemoved[0];
 
-    for (int i = 1; i < lastR; i++)
+    for (int i = 1; i < (lastR - opts->radOff); i++)
     {
         partRemoved[i] = PDE_sum[(i - 1) * 3 + 2] - PDE_sum[i * 3 + 2];
         sum_removed += (int)partRemoved[i];
     }
 
+    // add correction for radius offset
+
+    int correction = 0;
+    if (opts->radOff != 0)
+        correction = opts->radOff - 1;
+
     FILE *partSD_OUT = fopen(opts->poreSD_Out, "w+");
 
     fprintf(partSD_OUT, "r,p(r)\n");
-    for (int i = 0; i < lastR; i++)
+    for (int i = 0; i < (lastR - opts->radOff); i++)
     {
-        fprintf(partSD_OUT, "%d,%lf\n", i + 1, (double)partRemoved[i] / sum_removed);
+        fprintf(partSD_OUT, "%d,%lf\n", i + 1 + correction, (double)partRemoved[i] / sum_removed);
     }
 
     fclose(partSD_OUT);

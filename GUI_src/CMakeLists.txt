@@ -12,6 +12,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(app_icon_resource_windows "${CMAKE_CURRENT_SOURCE_DIR}/resources/appico.rc")
 
 
+
 find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets Core Concurrent)
 find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets Core Concurrent)
 find_package(OpenMP)
@@ -22,6 +23,7 @@ set(PROJECT_SOURCES
         mainwindow.h
         stb_image.h
         ED_PSD_CPU.hpp
+        data_structs.hpp
         mainwindow.ui
 )
 
@@ -30,6 +32,7 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         MANUAL_FINALIZATION
         ${PROJECT_SOURCES}
         ${app_icon_resource_windows}
+        data_structs.hpp
 
     )
 # Define target properties for Android with Qt 6 as:

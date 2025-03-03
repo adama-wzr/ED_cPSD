@@ -60,8 +60,10 @@ Additionally, you may want to consider acknowledging other publications that use
 - Advisor: Dr. Guang Yang (Oak-Ridge National Laboratory)
     - [Website](https://www.ornl.gov/staff-profile/guang-yang)
     - [GoogleScholar](https://scholar.google.com/citations?user=Ph_5mDMAAAAJ&hl=en)
-- Co-Advisor: Dr. Huazhen Fang (University of Kansas)
-    - 
+- Advisor: Dr. Huazhen Fang (University of Kansas)
+    - [Website](https://fang.ku.edu/)
+    - [Lab Website](https://www.issl.space/)
+    - [GoogleScholar](https://scholar.google.com/citations?user=3m7Yd4YAAAAJ&hl=en)
 # Documentation
 
 # Acknowledgements

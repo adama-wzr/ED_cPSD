@@ -699,8 +699,6 @@ int Worker::part2D_SD_ui(options *opts, sizeInfo2D *info, char *P, char POI)
     std::filesystem::path file (opts->partSD_Out);
     std::filesystem::path full_path = dir / file;
 
-
-
     FILE *partSD_OUT = fopen(full_path.generic_string().c_str(), "w+");
 
     fprintf(partSD_OUT, "r,p(r)\n");
@@ -943,7 +941,11 @@ int Worker::pore3D_SD_ui(options *opts, sizeInfo *info, char *P, int POI)
     if (opts->radOff != 0)
         correction = opts->radOff - 1;
 
-    FILE *partSD_OUT = fopen(opts->poreSD_Out, "w+");
+    std::filesystem::path dir (opts->folderName);
+    std::filesystem::path file (opts->poreSD_Out);
+    std::filesystem::path full_path = dir / file;
+
+    FILE *partSD_OUT = fopen(full_path.generic_string().c_str(), "w+");
 
     fprintf(partSD_OUT, "r,p(r)\n");
     for (int i = 0; i < (lastR - opts->radOff); i++)
@@ -1184,7 +1186,11 @@ int Worker::part3D_SD_ui(options *opts, sizeInfo *info, char *P, int POI)
     if (opts->radOff != 0)
         correction = opts->radOff - 1;
 
-    FILE *partSD_OUT = fopen(opts->partSD_Out, "w+");
+    std::filesystem::path dir (opts->folderName);
+    std::filesystem::path file (opts->partSD_Out);
+    std::filesystem::path full_path = dir / file;
+
+    FILE *partSD_OUT = fopen(full_path.generic_string().c_str(), "w+");
 
     fprintf(partSD_OUT, "r,p(r)\n");
     for (int i = 0; i < (lastR - opts->radOff); i++)

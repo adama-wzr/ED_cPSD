@@ -1611,8 +1611,6 @@ int partSD_3D(options *opts,
     std::filesystem::path file (opts->partSD_Out);
     std::filesystem::path full_path = dir / file;
 
-
-
     FILE *partSD_OUT = fopen(full_path.generic_string().c_str(), "w+");
 
     fprintf(partSD_OUT, "r,p(r)\n");

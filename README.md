@@ -13,7 +13,6 @@ The [Documentation](#documentation) and [publications](#publications) below cont
 5. [Authors](#code-authors)
 6. [Documentation](#documentation)
 7. [Acknowledgements](#acknowledgements)
-8. [Upcoming Changes](#upcoming-changes)
 9. [References](#references)
 
 # Requirements
@@ -69,8 +68,6 @@ Additionally, you may want to consider acknowledging other publications that use
 # Acknowledgements
 
 This work used Expanse(GPU)/Bridges2(CPU) at SDSC/PSC through allocations MAT210014 and MAT230071 from the Advanced Cyberinfrastructure Coordination Ecosystem: Services \& Support (ACCESS) program, which is supported by National Science Foundation grants 2138259, 2138286, 2138307, 2137603, and 2138296<sup>[[2]](https://doi.org/10.1145/3569951.3597559)</sup>.
-
-# Upcoming Changes
 
 # References
 1. Meijster, A., Roerdink, J. B. T. M., & Hesselink, W. H. (n.d.). A General Algorithm for Computing Distance Transforms in Linear Time. In Computational Imaging and Vision (pp. 331–340). Kluwer Academic Publishers. https://doi.org/10.1007/0-306-47025-x_36

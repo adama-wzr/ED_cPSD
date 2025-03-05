@@ -69,6 +69,8 @@ Additionally, you may want to consider acknowledging other publications that use
 
 This work used Expanse(GPU)/Bridges2(CPU) at SDSC/PSC through allocations MAT210014 and MAT230071 from the Advanced Cyberinfrastructure Coordination Ecosystem: Services \& Support (ACCESS) program, which is supported by National Science Foundation grants 2138259, 2138286, 2138307, 2137603, and 2138296<sup>[[2]](https://doi.org/10.1145/3569951.3597559)</sup>.
 
+X.L. highly appreciates the support from the National Science Foundation (Award 1941083 and 2329821).
+
 # References
 1. Meijster, A., Roerdink, J. B. T. M., & Hesselink, W. H. (n.d.). A General Algorithm for Computing Distance Transforms in Linear Time. In Computational Imaging and Vision (pp. 331–340). Kluwer Academic Publishers. https://doi.org/10.1007/0-306-47025-x_36
 2. Timothy J. Boerner, Stephen Deems, Thomas R. Furlani, Shelley L. Knuth, and John Towns. 2023. ACCESS: Advancing Innovation: NSF’s Advanced Cyberinfrastructure Coordination Ecosystem: Services & Support. “In Practice and Experience in Advanced Research Computing (PEARC ’23)”, July 23–27, 2023, Portland, OR, USA. ACM, New York, NY, USA, 4 pages. [https://doi.org/10.1145/3569951.3597559](https://doi.org/10.1145/3569951.3597559).

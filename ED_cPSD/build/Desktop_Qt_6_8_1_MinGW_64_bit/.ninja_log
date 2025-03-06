@@ -1,0 +1,20 @@
+# ninja log v6
+49	190	7628928053594721	ED_cPSD_autogen/timestamp	3c76ba10a6c8a7ce
+49	190	7628928053594721	ED_cPSD_autogen/mocs_compilation.cpp	3c76ba10a6c8a7ce
+49	190	7628928053594721	C:/Users/locoa/OneDrive/Documents/Research/ED_cPSD/ED_cPSD/build/Desktop_Qt_6_8_1_MinGW_64_bit-Debug/ED_cPSD_autogen/timestamp	3c76ba10a6c8a7ce
+49	190	7628928053594721	C:/Users/locoa/OneDrive/Documents/Research/ED_cPSD/ED_cPSD/build/Desktop_Qt_6_8_1_MinGW_64_bit-Debug/ED_cPSD_autogen/mocs_compilation.cpp	3c76ba10a6c8a7ce
+685	2225	7627359912215324	CMakeFiles/ED_cPSD.dir/main.cpp.obj	d29b48661592389a
+206	379	7611598759800459	CMakeFiles/ED_cPSD.dir/appico.rc.obj	59983e517d39aaa5
+769	2863	7628925768749214	CMakeFiles/ED_cPSD.dir/ED_cPSD_autogen/mocs_compilation.cpp.obj	7de233ce01698107
+191	2748	7628928055015317	CMakeFiles/ED_cPSD.dir/mainwindow.cpp.obj	806506b70c2e4ad1
+2748	3235	7628928080586025	ED_cPSD.exe	9c09e9b2076cbe8
+36	632	7628942497700311	build.ninja	874b5a91d8c9549b
+1169	3427	7610808841596526	CMakeFiles/ED_cPSD.dir/worker.cpp.obj	797e3310496dcbce
+163	1692	7610880960041361	CMakeFiles/ED_cPSD.dir/ED_PSD_CPU.cpp.obj	9bc98e737cea5cd1
+718	764	7621201273707820	CMakeFiles/ED_cPSD.dir/resources/appico.rc.obj	8adc308804af7565
+40	184	7628942709524784	ED_cPSD_autogen/timestamp	3c76ba10a6c8a7ce
+40	184	7628942709524784	ED_cPSD_autogen/mocs_compilation.cpp	3c76ba10a6c8a7ce
+40	184	7628942709524784	C:/Users/locoa/OneDrive/Documents/Research/ED_cPSD/ED_cPSD/build/Desktop_Qt_6_8_1_MinGW_64_bit-Debug/ED_cPSD_autogen/timestamp	3c76ba10a6c8a7ce
+40	184	7628942709524784	C:/Users/locoa/OneDrive/Documents/Research/ED_cPSD/ED_cPSD/build/Desktop_Qt_6_8_1_MinGW_64_bit-Debug/ED_cPSD_autogen/mocs_compilation.cpp	3c76ba10a6c8a7ce
+185	3006	7628942710974090	CMakeFiles/ED_cPSD.dir/mainwindow.cpp.obj	806506b70c2e4ad1
+3006	3709	7628942739186723	ED_cPSD.exe	2b650febd6fd459b

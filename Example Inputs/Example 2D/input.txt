@@ -1,0 +1,13 @@
+Input Parameters:
+nD: 2
+inputFilename: cRec2000.jpg
+TH: 127
+poreOut: defaultPoreOut.csv
+poreLabelOut: def_poreLabelOut.csv
+partOut: def_partSDOut.csv
+partLabelOut: def_partLabelOut.csv
+nThreads: 4
+maxR: 100
+verbose: 1
+offsetR: 0
+BatchSim: 0

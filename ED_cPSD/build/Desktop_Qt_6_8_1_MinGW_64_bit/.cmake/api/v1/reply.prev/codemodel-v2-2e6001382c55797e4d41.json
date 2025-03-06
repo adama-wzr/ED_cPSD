@@ -1,0 +1,79 @@
+{
+	"configurations" : 
+	[
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"hasInstallRule" : true,
+					"jsonFile" : "directory-.-Debug-e02d1908543304e76558.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.16"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2
+					]
+				}
+			],
+			"name" : "Debug",
+			"projects" : 
+			[
+				{
+					"directoryIndexes" : 
+					[
+						0
+					],
+					"name" : "ED_cPSD",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 0,
+					"id" : "ED_cPSD::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-ED_cPSD-Debug-cb757a29eb1439d5ec53.json",
+					"name" : "ED_cPSD",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "ED_cPSD_autogen::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-ED_cPSD_autogen-Debug-d3fbe7c13058cf2bec15.json",
+					"name" : "ED_cPSD_autogen",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "ED_cPSD_autogen_timestamp_deps::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-ED_cPSD_autogen_timestamp_deps-Debug-98788d39f7f18aa19b1f.json",
+					"name" : "ED_cPSD_autogen_timestamp_deps",
+					"projectIndex" : 0
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "C:/Users/locoa/OneDrive/Documents/Research/ED_cPSD/ED_cPSD/build/Desktop_Qt_6_8_1_MinGW_64_bit-Debug",
+		"source" : "C:/Users/locoa/OneDrive/Documents/Research/ED_cPSD/ED_cPSD"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 7
+	}
+}

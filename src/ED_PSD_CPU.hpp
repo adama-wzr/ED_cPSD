@@ -1595,7 +1595,7 @@ int partSD_3D(options *opts,
               int POI)
 {
     /*
-        Function partSD_3D:
+        Function poreSD_3D:
         Inputs:
             - pointer to options struct
             - pointer to structure info struct

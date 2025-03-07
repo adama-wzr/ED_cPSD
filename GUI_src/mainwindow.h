@@ -86,7 +86,6 @@ private slots:
     void clearTextRun();
     void runSim();
     void findOpFolder();
-    void handleFinish();
     void disableButtons();
     void enableButtons();  
 private:

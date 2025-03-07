@@ -1,0 +1,15 @@
+Input Parameters:
+nD: 3
+inputType: 0
+inputFilename: rec_729_300_int1.csv
+width: 300
+height: 300
+depth: 300
+poreOut: poreSD_rec729.csv
+poreLabelOut: poreLabels_rec729.csv
+partOut: partSD_rec729.csv
+partLabelOut: partLabels_rec729.csv
+nThreads: 8
+maxR: 100
+verbose: 1
+offsetR: 0

@@ -1255,10 +1255,11 @@ int partSD_2D(options *opts,
 
     int radius;
 
-    if(opts->radOff == 0)
+    if (opts->radOff == 0)
     {
         radius = 1;
-    } else
+    }
+    else
     {
         radius = opts->radOff;
     }
@@ -1464,10 +1465,11 @@ int poreSD_2D(options *opts,
 
     int radius = 1;
 
-    if(opts->radOff == 0)
+    if (opts->radOff == 0)
     {
         radius = 1;
-    } else
+    }
+    else
     {
         radius = opts->radOff;
     }
@@ -1672,10 +1674,11 @@ int partSD_3D(options *opts,
 
     int radius = 1;
 
-    if(opts->radOff == 0)
+    if (opts->radOff == 0)
     {
         radius = 1;
-    } else
+    }
+    else
     {
         radius = opts->radOff;
     }
@@ -1886,10 +1889,11 @@ int poreSD_3D(options *opts,
 
     int radius;
 
-    if(opts->radOff == 0)
+    if (opts->radOff == 0)
     {
         radius = 1;
-    } else
+    }
+    else
     {
         radius = opts->radOff;
     }

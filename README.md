@@ -36,11 +36,11 @@ g++ -fopenmp ./ED_PSD_CPU.cpp -o anyName
 
 That will create the executable `anyName.exe` on Windows and `anyName.out` on Linux.
 
-To compile the GUI into an executable, CMAKE is necessary.
+To compile the GUI into an executable, ensure you have all of the [requirements](#requirements), and build using the Qt Creator or CMAKE. The static executable is available for download in the ED_cPSD folder, and can be readily run on Windows without the need for a build. For more information on how to get the software running, check the Quickstart guide in the [documentation](https://github.com/adama-wzr/ED_cPSD/tree/main/doc).
 
 # Publications
 
-If you produce publishable results using this package, please acknowledge the following publication
+If you produce results using this package, please acknowledge the following publication
 
 - (Software publication incoming).
 
@@ -63,6 +63,7 @@ Additionally, you may want to consider acknowledging other publications that use
     - [Website](https://fang.ku.edu/)
     - [Lab Website](https://www.issl.space/)
     - [GoogleScholar](https://scholar.google.com/citations?user=3m7Yd4YAAAAJ&hl=en)
+
 # Documentation
 Extensive documentation and tutorials are included in the official documentation pdf, found [here](https://github.com/adama-wzr/ED_cPSD/tree/main/doc). If there are further questions with the software, the discussion can be started on GitHub directly or you can reach one of the authors via email.
 # Acknowledgements

@@ -64,7 +64,7 @@ Additionally, you may want to consider acknowledging other publications that use
     - [Lab Website](https://www.issl.space/)
     - [GoogleScholar](https://scholar.google.com/citations?user=3m7Yd4YAAAAJ&hl=en)
 # Documentation
-
+Extensive documentation and tutorials are included in the official documentation pdf, found [here](https://github.com/adama-wzr/ED_cPSD/tree/main/doc). If there are further questions with the software, the discussion can be started on GitHub directly or you can reach one of the authors via email.
 # Acknowledgements
 
 This work used Expanse(GPU)/Bridges2(CPU) at SDSC/PSC through allocations MAT210014 and MAT230071 from the Advanced Cyberinfrastructure Coordination Ecosystem: Services \& Support (ACCESS) program, which is supported by National Science Foundation grants 2138259, 2138286, 2138307, 2137603, and 2138296<sup>[[2]](https://doi.org/10.1145/3569951.3597559)</sup>.

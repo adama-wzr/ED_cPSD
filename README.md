@@ -21,7 +21,7 @@ The base source code only requires the following:
 - C++17 or newer.
 - GNU Compiler (any recent version, was tested on gcc 13.1.0, but other versions should be fine).
 - OpenMP (any recent version, this is attached to the gcc compiler on Windows).
-- [stb_image](https://github.com/nothings/stb) any recent version.
+- [stb_image](https://github.com/nothings/stb) any recent version. You do not need the whole library, just the loader `stb_image.h`.
 
 The GUI requires:
 - Qt6.8 or newer (older versions might work, not guaranteed).

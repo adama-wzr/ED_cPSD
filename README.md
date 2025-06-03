@@ -42,7 +42,7 @@ To compile the GUI into an executable, ensure you have all of the [requirements]
 
 If you produce results using this package, please acknowledge the following publication
 
-- **Pre-print:**  Adam, Andre and Fang, Huazhen and Guang, Yang and Li, Xianglin, ED-cPSD: Fast Phase-Size Distribution Via Sequential Erosion-Dilation. Available at SSRN: https://ssrn.com/abstract=5225606 or http://dx.doi.org/10.2139/ssrn.5225606 
+- A. Adam, H. Fang, G. Yang, X. Li (2025). ED-cPSD: Fast Phase-Size Distribution Via Sequential Erosion-Dilation. SoftwareX. https://doi.org/10.1016/j.softx.2025.102211
 
 Additionally, you may want to consider acknowledging other publications that used this work:
 

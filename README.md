@@ -9,7 +9,7 @@ The [Documentation](#documentation) and [publications](#publications) below cont
 1. [Requirements](#requirements)
 2. [Compilation](#compilation)
 3. [Required Files](#required-files)
-4. [Publications](#ppublications)
+4. [Publications](#publications)
 5. [Authors](#code-authors)
 6. [Documentation](#documentation)
 7. [Acknowledgements](#acknowledgements)

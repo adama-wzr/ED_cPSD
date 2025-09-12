@@ -416,6 +416,9 @@ int readImg_2D(char *target_name,
 
     *targetPtr = stbi_load(target_name, &imgInfo->width, &imgInfo->height, &channel, 1);
 
+    printf("H = %d, W = %d, nC = %d\n", imgInfo->height, imgInfo->width, channel);
+    printf("Img name = %s\n", target_name);
+
     if (channel != 1)
         return 1;
 
@@ -2225,6 +2228,57 @@ int batchSim2D(options *opts)
 
     int nSim = opts->nFiles;
 
+    float *d50;
+    float *t50;
 
+    if (opts->partSD)
+        t50 = (float *)malloc(sizeof(float) * opts->nFiles);
+    
+    if (opts->poreSD)
+        d50 = (float *)malloc(sizeof(float) * opts->nFiles);
+
+    for (int n = 0; n < nSim; n++)
+    {
+        // Adjust input and output filenames
+
+        sprintf(opts->inputFilename, "%0*d.jpg", opts->LeadZero, n);
+
+        if(opts->partSD)
+        {
+            sprintf(opts->partSD_Out, "PartSD_%0*d.csv", opts->LeadZero, n);
+            if(opts->partLabel)
+            {
+                sprintf(opts->partLabel_Out, "PartLabel_%0*d.csv", opts->LeadZero, n);
+            }
+        }
+
+        if(opts->poreSD)
+        {
+            sprintf(opts->poreSD_Out, "PoreSD_%0*d.csv", opts->LeadZero, n);
+            if(opts->poreLabel)
+            {
+                sprintf(opts->poreLabel_Out, "PoreLabel_%0*d.csv", opts->LeadZero, n);
+            }
+        }
+
+        if (opts->verbose)
+            printf("%s\n", opts->inputFilename);
+
+        // Run Simulation
+        Sim2D(opts);
+
+        // calc d50/t50 and store
+            
+    }
+
+    // print output
+
+    // Memory Management
+    if(opts->poreSD)
+        free(d50);
+    
+    if(opts->partSD)
+        free(t50);
+    
     return 0;
 }

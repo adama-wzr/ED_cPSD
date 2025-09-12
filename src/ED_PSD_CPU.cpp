@@ -5,7 +5,7 @@
     This version is just a main file, will call functions from helper files.
 
     Last Update:
-    02/24/2025
+    09/12/2025
 
     Andre Adam.
 */
@@ -32,10 +32,21 @@ int main(void)
 
     if (opts.verbose)
         printOpts(&opts);
-
-    if (opts.nD == 2)
+    
+    if (opts.batch)
+    {
+        if(opts.nD == 2)
+            batchSim2D(&opts);
+        else
+        {
+            printf("Method not implemented yet. Batch only available in 2D\n");
+            return 1;
+        }
+    } else
+    {
         Sim2D(&opts);
-
+    }
+    
     if (opts.nD == 3)
         Sim3D(&opts);
 

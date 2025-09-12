@@ -45,6 +45,9 @@ typedef struct
     int radOff;          // radius offset
     int stackSize;       // stack size
     char LeadZero;       // number of leading zeroes
+    bool PB;             // periodic boundary condition (1 == true, 0 == false)
+    bool batch;          // run a batch of files or no? (1 == true, 0 == false)
+    int nFiles;          // number of imgs for batch mode
 } options;
 
 typedef struct
@@ -84,13 +87,22 @@ void printOpts(options *opts)
     printf("c-PSD Simulation\n");
     printf("Current selected options:\n\n");
     printf("--------------------------------------\n");
+    if(opts->PB)
+        printf("Using Periodic Boundary Conditions\n");
+    
     printf("Number of Dimensions: %d\n", opts->nD);
     printf("InputType = %d\n", opts->inputType);
 
     // separate dimensions
     if (opts->nD == 2)
     {
-        if (opts->inputType == 0)
+        if (opts->PB)
+        {
+            printf("Running a Batch:\n");
+            printf("Number of Simulations: %d\n", opts->nFiles);
+
+        }
+        else if (opts->inputType == 0)
         {
             printf("Input Name: %s\n", opts->inputFilename);
             printf("Phase Threshold: %d\n", (int)opts->TH);
@@ -187,6 +199,11 @@ int readInput(char *inputFilename, options *opts)
 
     opts->stackSize = 1;
     opts->LeadZero = 5;
+
+    opts->batch = false;
+    opts->nFiles = 0;
+
+    opts->PB = false;
 
     /*
     --------------------------------------------------------------------------------
@@ -286,6 +303,18 @@ int readInput(char *inputFilename, options *opts)
         else if (strcmp(tempC, "offsetR:") == 0)
         {
             opts->radOff = (int)tempD;
+        }
+        else if(strcmp(tempC, "Batch:") == 0)
+        {
+            opts->batch = (bool)tempD;
+        }
+        else if(strcmp(tempC, "nSim:") == 0)
+        {
+            opts->nFiles = (int)tempD;
+        }
+        else if(strcmp(tempC, "PB:") == 0)
+        {
+            opts->PB = (bool)tempD;
         }
     }
     return 0;
@@ -2177,6 +2206,25 @@ int Sim3D(options *opts)
         poreSD_3D(opts, &info, P, 0);
 
     free(P);
+
+    return 0;
+}
+
+
+int batchSim2D(options *opts)
+{
+    /*
+        Function batchSim2D:
+        Input:
+            - opts struct
+        Outputs:
+            - none
+        
+        Function will run a batch of 2D simulations based on the user entered input.
+    */
+
+    int nSim = opts->nFiles;
+
 
     return 0;
 }

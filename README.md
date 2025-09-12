@@ -4,7 +4,7 @@ This repository is dedicated to the simulation of continuous phase-size distribu
 
 The [Documentation](#documentation) and [publications](#publications) below contain more detail about the computational model, validation, and some example use cases for this code.
 
-Check the [Future Updates](#future_updates) section and for active branches of development and plans for ongoing efforts!
+Check the [Future Updates](#future-updates) section and for active branches of development and plans for ongoing efforts!
 
 # Table of Contents
 
@@ -14,7 +14,7 @@ Check the [Future Updates](#future_updates) section and for active branches of d
 4. [Publications](#publications)
 5. [Authors](#code-authors)
 6. [Documentation](#documentation)
-7. [Future Updates](#future_updates)
+7. [Future Updates](#future-updates)
 8. [Acknowledgements](#acknowledgements)
 9. [References](#references)
 

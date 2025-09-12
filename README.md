@@ -4,6 +4,8 @@ This repository is dedicated to the simulation of continuous phase-size distribu
 
 The [Documentation](#documentation) and [publications](#publications) below contain more detail about the computational model, validation, and some example use cases for this code.
 
+Check the [Future Updates](#future-updates) section and for active branches of development and plans for ongoing efforts!
+
 # Table of Contents
 
 1. [Requirements](#requirements)
@@ -12,7 +14,8 @@ The [Documentation](#documentation) and [publications](#publications) below cont
 4. [Publications](#publications)
 5. [Authors](#code-authors)
 6. [Documentation](#documentation)
-7. [Acknowledgements](#acknowledgements)
+7. [Future Updates](#future-updates)
+8. [Acknowledgements](#acknowledgements)
 9. [References](#references)
 
 # Requirements
@@ -66,6 +69,18 @@ Additionally, you may want to consider acknowledging other publications that use
 
 # Documentation
 Extensive documentation and tutorials are included in the official documentation pdf, found [here](https://github.com/adama-wzr/ED_cPSD/tree/main/doc). If there are further questions with the software, the discussion can be started on GitHub directly or you can reach one of the authors via email.
+
+# Future Updates
+
+There is one active branch of development. This branch will initially add two features:
+
+1. batch execution (for evaluating large numbers of PSDs)
+2. Periodic boundary conditions.
+
+Those features will be added to the 2D code first, then 3D code. The GUI will be updated once the code is working and validated. Updates will only be pushed to main once they are validated and confirmed to behave accordingly.
+
+If there are suggestions for additional features, please let one of the authors know or open an issue here on GitHub.
+
 # Acknowledgements
 
 This work used Expanse(GPU)/Bridges2(CPU) at SDSC/PSC through allocations MAT210014 and MAT230071 from the Advanced Cyberinfrastructure Coordination Ecosystem: Services \& Support (ACCESS) program, which is supported by National Science Foundation grants 2138259, 2138286, 2138307, 2137603, and 2138296<sup>[[2]](https://doi.org/10.1145/3569951.3597559)</sup>.

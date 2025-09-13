@@ -1236,18 +1236,25 @@ int partSD_2D(options *opts,
 
     // Array for storing radii
 
-    int *R;
+    int *R = (int *)malloc(sizeof(int) * info->nElements);
     int *L;
 
     if (opts->partLabel)
     {
-        R = (int *)malloc(sizeof(int) * info->nElements);
         L = (int *)malloc(sizeof(int) * info->nElements);
 
         for (int i = 0; i < info->nElements; i++)
         {
             R[i] = -1;
             L[i] = -1;
+        }
+    }
+    else
+    {
+        // this avoids redundant loops
+        for (int i = 0; i < info->nElements; i++)
+        {
+            R[i] = -1;
         }
     }
 
@@ -1334,9 +1341,6 @@ int partSD_2D(options *opts,
             d_sum += D[i];
             e_sum += E[i];
 
-            if (!opts->partLabel)
-                continue;
-
             if (P[i] - E[i] == 1 && R[i] == -1)
                 R[i] = radius;
         }
@@ -1361,15 +1365,19 @@ int partSD_2D(options *opts,
     long int sum_removed = 0;
     double *partRemoved = (double *)malloc(sizeof(double) * (lastR - opts->radOff));
 
-    // get particles removed at R = 1
+    memset(partRemoved, 0, sizeof(double) * (lastR - opts->radOff));
 
-    partRemoved[0] = PDE_sum[0 * 3 + 0] - PDE_sum[0 * 3 + 2];
-    sum_removed += (int)partRemoved[0];
-
-    for (int i = 1; i < (lastR - opts->radOff); i++)
+    for(long int index = 0; index < info->nElements; index++)
     {
-        partRemoved[i] = PDE_sum[(i - 1) * 3 + 2] - PDE_sum[i * 3 + 2];
-        sum_removed += (int)partRemoved[i];
+        if(P[index] == POI && R[index] != -1)
+        {
+            partRemoved[R[index]]++;
+        }
+    }
+
+    for(int i = 0; i < (lastR - opts->radOff); i++)
+    {
+        sum_removed += partRemoved[i];
     }
 
     // correction for radius offset
@@ -1398,7 +1406,6 @@ int partSD_2D(options *opts,
     {
         ParticleLabel2D(opts->radOff, lastR, R, L, info);
         saveLabels2D(R, L, info, opts->partLabel_Out);
-        free(R);
         free(L);
     }
 
@@ -1410,6 +1417,8 @@ int partSD_2D(options *opts,
     free(B);
     free(E);
     free(D);
+
+    free(R);
 
     return 0;
 }
@@ -1450,18 +1459,25 @@ int poreSD_2D(options *opts,
 
     // Array for storing radii
 
-    int *R;
+    int *R = (int *)malloc(sizeof(int) * info->nElements);
     int *L;
 
     if (opts->poreLabel)
     {
-        R = (int *)malloc(sizeof(int) * info->nElements);
         L = (int *)malloc(sizeof(int) * info->nElements);
 
         for (int i = 0; i < info->nElements; i++)
         {
             R[i] = -1;
             L[i] = -1;
+        }
+    }
+    else
+    {
+        // this avoids redundant loops
+        for (int i = 0; i < info->nElements; i++)
+        {
+            R[i] = -1;
         }
     }
 
@@ -1544,9 +1560,6 @@ int poreSD_2D(options *opts,
             d_sum += D[i];
             e_sum += E[i];
 
-            if (!opts->poreLabel)
-                continue;
-
             if (B[i] - E[i] == 1 && R[i] == -1)
                 R[i] = radius;
         }
@@ -1570,15 +1583,20 @@ int poreSD_2D(options *opts,
     long int sum_removed = 0;
     double *poreRemoved = (double *)malloc(sizeof(double) * (lastR - opts->radOff));
 
-    // get particles removed at R = 1
+    memset(poreRemoved, 0, sizeof(double) * (lastR - opts->radOff));
 
-    poreRemoved[0] = PDE_sum[0 * 3 + 0] - PDE_sum[0 * 3 + 2];
-    sum_removed += (int)poreRemoved[0];
-
-    for (int i = 1; i < (lastR - opts->radOff); i++)
+    for(long int index = 0; index < info->nElements; index++)
     {
-        poreRemoved[i] = PDE_sum[(i - 1) * 3 + 2] - PDE_sum[i * 3 + 2];
-        sum_removed += (int)poreRemoved[i];
+        if(P[index] == POI && R[index] != -1)
+        {
+            poreRemoved[R[index]]++;
+        }
+    }
+
+    for(int i = 0; i < (lastR - opts->radOff); i++)
+    {
+        sum_removed += poreRemoved[i];
+        printf("Pore Removed[%d] = %lf\n", i, poreRemoved[i]);
     }
 
     // correction for radius offset
@@ -1607,7 +1625,6 @@ int poreSD_2D(options *opts,
     {
         ParticleLabel2D(opts->radOff, lastR, R, L, info);
         saveLabels2D(R, L, info, opts->poreLabel_Out);
-        free(R);
         free(L);
     }
 
@@ -1619,6 +1636,8 @@ int poreSD_2D(options *opts,
     free(B);
     free(E);
     free(D);
+
+    free(R);
 
     return 0;
 }

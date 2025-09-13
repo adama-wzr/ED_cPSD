@@ -48,6 +48,7 @@ typedef struct
     bool PB;             // periodic boundary condition (1 == true, 0 == false)
     bool batch;          // run a batch of files or no? (1 == true, 0 == false)
     int nFiles;          // number of imgs for batch mode
+    char *batchName;     // name for saving batch results (d50 and t50)
 } options;
 
 typedef struct
@@ -96,11 +97,11 @@ void printOpts(options *opts)
     // separate dimensions
     if (opts->nD == 2)
     {
-        if (opts->PB)
+        if (opts->batch)
         {
             printf("Running a Batch:\n");
             printf("Number of Simulations: %d\n", opts->nFiles);
-
+            printf("Batch Output Name: %s\n", opts->batchName);
         }
         else if (opts->inputType == 0)
         {
@@ -315,6 +316,12 @@ int readInput(char *inputFilename, options *opts)
         else if(strcmp(tempC, "PB:") == 0)
         {
             opts->PB = (bool)tempD;
+        }
+        else if (strcmp(tempC, "BatchName:") == 0)
+        {
+            sscanf(myText.c_str(), "%s %s", tempC, tempFilenames);
+            opts->batchName = (char *)malloc(1000 * sizeof(char));
+            strcpy(opts->batchName, tempFilenames);
         }
     }
     return 0;
@@ -1596,7 +1603,6 @@ int poreSD_2D(options *opts,
     for(int i = 0; i < (lastR - opts->radOff); i++)
     {
         sum_removed += poreRemoved[i];
-        printf("Pore Removed[%d] = %lf\n", i, poreRemoved[i]);
     }
 
     // correction for radius offset

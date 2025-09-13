@@ -2253,15 +2253,6 @@ int batchSim2D(options *opts)
 
     int nSim = opts->nFiles;
 
-    float *d50;
-    float *t50;
-
-    if (opts->partSD)
-        t50 = (float *)malloc(sizeof(float) * opts->nFiles);
-    
-    if (opts->poreSD)
-        d50 = (float *)malloc(sizeof(float) * opts->nFiles);
-
     for (int n = 0; n < nSim; n++)
     {
         // Adjust input and output filenames
@@ -2291,19 +2282,7 @@ int batchSim2D(options *opts)
 
         // Run Simulation
         Sim2D(opts);
-
-        // calc d50/t50 and store
-            
     }
-
-    // print output
-
-    // Memory Management
-    if(opts->poreSD)
-        free(d50);
-    
-    if(opts->partSD)
-        free(t50);
     
     return 0;
 }

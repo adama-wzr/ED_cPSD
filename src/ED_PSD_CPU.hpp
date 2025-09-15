@@ -872,6 +872,139 @@ void pMeijster2D(bool *targetArray,
     return;
 }
 
+void pMeijster2D_PB(bool *targetArray,
+                    int *targetEDT,
+                    sizeInfo2D *structureInfo,
+                    int primaryPhase)
+{
+    /*
+        Function pMeijster2D_PB:
+        Inputs:
+            - pointer to targetArray, where the structure is held
+            - pointer to targetEDT, where the EDT will go.
+            - pointer to sizeInfo2D sruct
+            - primaryPhase dictates the phase which the EDT will be calculated in relation to.
+        Outputs:
+            - None.
+        This function calculates the EDT in 2D using parallel computing, assumes
+        periodic boundary conditions.
+    */
+    int height, width;
+
+    height = structureInfo->height * 2;
+    width = structureInfo->width * 2;
+    long int nElements = structureInfo->nElements * 4;
+
+    // make the new array
+
+    bool *B_ext = (bool *)malloc(sizeof(bool) * nElements);
+    memset(B_ext, 0, nElements * sizeof(bool));
+
+    // store offsets
+
+    int realWidth, realHeight;
+    realWidth = width / 2;
+    realHeight = height / 2;
+
+    for (long int index = 0; index < nElements; index++)
+    {
+        // break down index
+        int row, col;
+        row = (index)/width;
+        col = index - row * width;
+
+        // get real index (offset by 50% for periodic boundary)
+        int realCol, realRow;
+
+        realCol = col - realWidth/2;
+        realRow = row - realHeight/2;
+
+        // fix out-of-bounds index
+
+        if(realCol < 0)
+        {
+            realCol = realWidth + realCol;
+        }
+        else if (realCol > realWidth - 1)
+        {
+            realCol = realCol - realWidth;
+        }
+
+        if (realRow < 0)
+        {
+            realRow = realHeight + realRow;
+        }
+        else if( realRow > realHeight - 1)
+        {
+            realRow  = realRow - realHeight;
+        }
+
+        // Finally assing the new structure
+
+        if(targetArray[realRow * realWidth + realCol] == 1)
+        {
+            B_ext[index] = 1;
+        }
+    }
+
+    int *B_EDT = (int *)malloc(sizeof(int) * nElements);
+    memset(B_EDT, 0, sizeof(int) * nElements);
+
+    int *g = (int *)malloc(sizeof(int) * nElements);
+    memset(g, 0, sizeof(int) * nElements);
+
+#pragma omp parallel
+    {
+        // local DT, s, and t for each column scan (fixed row)
+        int *s = (int *)malloc(sizeof(int) * width);
+        int *t = (int *)malloc(sizeof(int) * width);
+        memset(s, 0, sizeof(int) * width);
+        memset(t, 0, sizeof(int) * width);
+// phase 1
+#pragma omp for schedule(auto)
+        for (int j = 0; j < width; j++)
+        {
+            int offset = j;
+            pass12_2D(B_ext, g, height, width, offset, primaryPhase);
+        }
+// phase 2
+#pragma omp for schedule(auto)
+        for (int row = 0; row < height; row++)
+        {
+            int offset = row;
+            pass34_2D(g, B_EDT, width, offset, s, t);
+        }
+        free(s);
+        free(t);
+    }
+
+    // deconstruct B_EDT into target EDT
+
+    for(int index = 0; index < nElements/4; index++)
+    {
+        // get index for real array
+        int col, row;
+        row = (index) / realWidth;
+        col = index - row * realWidth;
+
+        // tranform it into the index for the extended array
+        int extCol, extRow;
+        extCol = col + realWidth/2;
+        extRow = row + realHeight/2;
+
+        // Transfer EDT
+        targetEDT[index] = B_EDT[extRow * width + extCol];
+    }
+
+    // Memory management
+    free(B_EDT);
+    free(B_ext);
+
+    free(g);
+
+    return;
+}
+
 void pMeijster3D(bool *targetArray,
                  float *targetEDT,
                  sizeInfo *structureInfo,
@@ -1297,7 +1430,15 @@ double partSD_2D(options *opts,
 
     // EDT for dilation is a one time operation
 
-    pMeijster2D(B, EDT_D, info, 0); // 0 is the phase that will be dilated
+    if(opts->PB)
+    {
+        pMeijster2D_PB(B, EDT_D, info, 0); // 0 is the phase that will be dilated
+    }
+    else
+    {
+        pMeijster2D(B, EDT_D, info, 0); // 0 is the phase that will be dilated
+    }
+    
 
     int radius;
 
@@ -1327,8 +1468,14 @@ double partSD_2D(options *opts,
         memcpy(E, D, sizeof(bool) * info->nElements);
 
         // Meijster in D
-
-        pMeijster2D(D, EDT_E, info, 1);
+        if(opts->PB)
+        {
+            pMeijster2D_PB(D, EDT_E, info, 1);
+        }
+        else
+        {
+            pMeijster2D(D, EDT_E, info, 1);
+        }
 
 // Update E
 #pragma omp parallel for schedule(auto)
@@ -1524,8 +1671,14 @@ double poreSD_2D(options *opts,
     }
 
     // EDT for dilation is a one time operation
-
-    pMeijster2D(B, EDT_D, info, 0); // 0 is the phase that will be dilated
+    if(opts->PB)
+    {
+        pMeijster2D_PB(B, EDT_D, info, 0);
+    }
+    else
+    {
+        pMeijster2D(B, EDT_D, info, 0); // 0 is the phase that will be dilated
+    }
 
     int radius = 1;
 
@@ -1555,8 +1708,14 @@ double poreSD_2D(options *opts,
         memcpy(E, D, sizeof(bool) * info->nElements);
 
         // Meijster in D
-
-        pMeijster2D(D, EDT_E, info, 1);
+        if (opts->PB)
+        {
+            pMeijster2D_PB(D, EDT_E, info, 1);
+        }
+        else
+        {
+            pMeijster2D(D, EDT_E, info, 1);
+        }        
 
 // Update E
 #pragma omp parallel for schedule(auto)

@@ -1207,7 +1207,7 @@ void ParticleLabel3D(int rMin,
 
  --------------------------------------------------------*/
 
-int partSD_2D(options *opts,
+double partSD_2D(options *opts,
               sizeInfo2D *info,
               char *P,
               char POI)
@@ -1220,7 +1220,7 @@ int partSD_2D(options *opts,
             - pointer to phase-array
             - char phase of interest
         Outputs:
-            - None.
+            - t50.
         Function will calculate particle size distribution of array P.
     */
 
@@ -1400,6 +1400,15 @@ int partSD_2D(options *opts,
         fprintf(partSD_OUT, "%d,%lf\n", i + 1 + correction, (double)partRemoved[i] / sum_removed);
     }
 
+    double t50 = 0.0;
+    double p = 0.0;
+
+    for(int i = 0; i < (lastR - opts->radOff); i++)
+    {
+        p = (double)partRemoved[i] / sum_removed;
+        t50 += p*(2*(i + 1 + correction));
+    }
+
     fclose(partSD_OUT);
 
     // partial memory management
@@ -1427,10 +1436,10 @@ int partSD_2D(options *opts,
 
     free(R);
 
-    return 0;
+    return t50;
 }
 
-int poreSD_2D(options *opts,
+double poreSD_2D(options *opts,
               sizeInfo2D *info,
               char *P,
               char POI)
@@ -1443,7 +1452,7 @@ int poreSD_2D(options *opts,
             - pointer to phase-array
             - char phase of interest
         Outputs:
-            - None.
+            - d50.
         Function will calculate pore size distribution of array P.
     */
 
@@ -1620,6 +1629,15 @@ int poreSD_2D(options *opts,
 
     fclose(poreSD_OUT);
 
+    double d50 = 0.0;
+    double p = 0.0;
+
+    for(int i = 0; i < (lastR - opts->radOff); i++)
+    {
+        p = (double)poreRemoved[i] / sum_removed;
+        d50 += p*(2*(i + 1 + correction));
+    }
+
     // partial memory management
 
     free(poreRemoved);
@@ -1645,7 +1663,7 @@ int poreSD_2D(options *opts,
 
     free(R);
 
-    return 0;
+    return d50;
 }
 
 int partSD_3D(options *opts,
@@ -2140,11 +2158,49 @@ int Sim2D(options *opts)
 
     // Perform the selected simulations
 
+    double t50, d50;
+
     if (opts->partSD)
-        partSD_2D(opts, &imgInfo, P, 1);
+        t50 = partSD_2D(opts, &imgInfo, P, 1);
+
 
     if (opts->poreSD)
-        poreSD_2D(opts, &imgInfo, P, 0);
+        d50 = poreSD_2D(opts, &imgInfo, P, 0);
+
+    if(opts->batch)
+    {
+        // check if file exists
+        bool fileFlag = true;
+        if (FILE *BATCH = fopen(opts->batchName, "r"))
+        {
+            fclose(BATCH);
+            fileFlag = false;
+        }
+        
+        // open file in append mode and add stuff
+
+        FILE *BATCH = fopen(opts->batchName, "a+");
+
+        // print d50 and t50
+        if (opts->partLabel && !opts->poreLabel)
+        {
+            if(fileFlag)
+                fprintf(BATCH, "t50\n");
+            fprintf(BATCH, "%1.3e\n", t50);
+        }else if(!opts->partLabel && opts->poreLabel)
+        {
+            if(fileFlag)
+                fprintf(BATCH, "d50\n");
+            fprintf(BATCH, "%1.3e\n", d50);
+        }else
+        {
+            if(fileFlag)
+                fprintf(BATCH, "d50,t50\n");
+            fprintf(BATCH, "%1.3e,%1.3e\n", d50, t50);
+        }
+
+        fclose(BATCH);
+    }
 
     // Memory Management
     free(P);

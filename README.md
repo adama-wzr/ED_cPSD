@@ -14,9 +14,10 @@ Check the [Future Updates](#future-updates) section and for active branches of d
 4. [Publications](#publications)
 5. [Authors](#code-authors)
 6. [Documentation](#documentation)
-7. [Future Updates](#future-updates)
-8. [Acknowledgements](#acknowledgements)
-9. [References](#references)
+7. [Recent Updates](#recent-updates)
+8. [Future Updates](#future-updates)
+9. [Acknowledgements](#acknowledgements)
+10. [References](#references)
 
 # Requirements
 
@@ -70,14 +71,20 @@ Additionally, you may want to consider acknowledging other publications that use
 # Documentation
 Extensive documentation and tutorials are included in the official documentation pdf, found [here](https://github.com/adama-wzr/ED_cPSD/tree/main/doc). If there are further questions with the software, the discussion can be started on GitHub directly or you can reach one of the authors via email.
 
+# Recent Updates
+
+Sept. 15th 2025:
+- Periodic boundary condiitons (2D)
+- Batch execution (2D)
+
 # Future Updates
 
 There is one active branch of development. This branch will initially add two features:
 
-1. batch execution (for evaluating large numbers of PSDs)
-2. Periodic boundary conditions.
+1. batch execution (3D + GUI)
+2. Periodic boundary conditions (3D + GUI).
 
-Those features will be added to the 2D code first, then 3D code. The GUI will be updated once the code is working and validated. Updates will only be pushed to main once they are validated and confirmed to behave accordingly.
+These already work for the 2D version source code, and 3D and GUI will come next. Changes to the code documentation are also pending.
 
 If there are suggestions for additional features, please let one of the authors know or open an issue here on GitHub.
 

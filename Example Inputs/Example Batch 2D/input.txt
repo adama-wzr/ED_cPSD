@@ -1,0 +1,17 @@
+Input Parameters:
+nD: 2
+inputFilename: 00001.jpg
+TH: 127
+poreOut: defaultPoreOut.csv
+poreLabelOut: def_poreLabelOut.csv
+partOut: def_partSDOut.csv
+partLabelOut: def_partLabelOut.csv
+nThreads: 4
+maxR: 200
+verbose: 1
+offsetR: 0
+Batch: 1
+nSim: 5
+leadZero: 5
+BatchName: TestB.csv
+PB: 1

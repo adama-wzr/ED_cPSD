@@ -45,6 +45,10 @@ typedef struct
     int radOff;          // radius offset
     int stackSize;       // stack size
     char LeadZero;       // number of leading zeroes
+    bool PB;             // periodic boundary condition (1 == true, 0 == false)
+    bool batch;          // run a batch of files or no? (1 == true, 0 == false)
+    int nFiles;          // number of imgs for batch mode
+    char *batchName;     // name for saving batch results (d50 and t50)
 } options;
 
 typedef struct
@@ -84,13 +88,22 @@ void printOpts(options *opts)
     printf("c-PSD Simulation\n");
     printf("Current selected options:\n\n");
     printf("--------------------------------------\n");
+    if(opts->PB)
+        printf("Using Periodic Boundary Conditions\n");
+    
     printf("Number of Dimensions: %d\n", opts->nD);
     printf("InputType = %d\n", opts->inputType);
 
     // separate dimensions
     if (opts->nD == 2)
     {
-        if (opts->inputType == 0)
+        if (opts->batch)
+        {
+            printf("Running a Batch:\n");
+            printf("Number of Simulations: %d\n", opts->nFiles);
+            printf("Batch Output Name: %s\n", opts->batchName);
+        }
+        else if (opts->inputType == 0)
         {
             printf("Input Name: %s\n", opts->inputFilename);
             printf("Phase Threshold: %d\n", (int)opts->TH);
@@ -187,6 +200,11 @@ int readInput(char *inputFilename, options *opts)
 
     opts->stackSize = 1;
     opts->LeadZero = 5;
+
+    opts->batch = false;
+    opts->nFiles = 0;
+
+    opts->PB = false;
 
     /*
     --------------------------------------------------------------------------------
@@ -287,6 +305,24 @@ int readInput(char *inputFilename, options *opts)
         {
             opts->radOff = (int)tempD;
         }
+        else if(strcmp(tempC, "Batch:") == 0)
+        {
+            opts->batch = (bool)tempD;
+        }
+        else if(strcmp(tempC, "nSim:") == 0)
+        {
+            opts->nFiles = (int)tempD;
+        }
+        else if(strcmp(tempC, "PB:") == 0)
+        {
+            opts->PB = (bool)tempD;
+        }
+        else if (strcmp(tempC, "BatchName:") == 0)
+        {
+            sscanf(myText.c_str(), "%s %s", tempC, tempFilenames);
+            opts->batchName = (char *)malloc(1000 * sizeof(char));
+            strcpy(opts->batchName, tempFilenames);
+        }
     }
     return 0;
 }
@@ -386,6 +422,9 @@ int readImg_2D(char *target_name,
     int channel;
 
     *targetPtr = stbi_load(target_name, &imgInfo->width, &imgInfo->height, &channel, 1);
+
+    printf("H = %d, W = %d, nC = %d\n", imgInfo->height, imgInfo->width, channel);
+    printf("Img name = %s\n", target_name);
 
     if (channel != 1)
         return 1;
@@ -833,6 +872,139 @@ void pMeijster2D(bool *targetArray,
     return;
 }
 
+void pMeijster2D_PB(bool *targetArray,
+                    int *targetEDT,
+                    sizeInfo2D *structureInfo,
+                    int primaryPhase)
+{
+    /*
+        Function pMeijster2D_PB:
+        Inputs:
+            - pointer to targetArray, where the structure is held
+            - pointer to targetEDT, where the EDT will go.
+            - pointer to sizeInfo2D sruct
+            - primaryPhase dictates the phase which the EDT will be calculated in relation to.
+        Outputs:
+            - None.
+        This function calculates the EDT in 2D using parallel computing, assumes
+        periodic boundary conditions.
+    */
+    int height, width;
+
+    height = structureInfo->height * 2;
+    width = structureInfo->width * 2;
+    long int nElements = structureInfo->nElements * 4;
+
+    // make the new array
+
+    bool *B_ext = (bool *)malloc(sizeof(bool) * nElements);
+    memset(B_ext, 0, nElements * sizeof(bool));
+
+    // store offsets
+
+    int realWidth, realHeight;
+    realWidth = width / 2;
+    realHeight = height / 2;
+
+    for (long int index = 0; index < nElements; index++)
+    {
+        // break down index
+        int row, col;
+        row = (index)/width;
+        col = index - row * width;
+
+        // get real index (offset by 50% for periodic boundary)
+        int realCol, realRow;
+
+        realCol = col - realWidth/2;
+        realRow = row - realHeight/2;
+
+        // fix out-of-bounds index
+
+        if(realCol < 0)
+        {
+            realCol = realWidth + realCol;
+        }
+        else if (realCol > realWidth - 1)
+        {
+            realCol = realCol - realWidth;
+        }
+
+        if (realRow < 0)
+        {
+            realRow = realHeight + realRow;
+        }
+        else if( realRow > realHeight - 1)
+        {
+            realRow  = realRow - realHeight;
+        }
+
+        // Finally assing the new structure
+
+        if(targetArray[realRow * realWidth + realCol] == 1)
+        {
+            B_ext[index] = 1;
+        }
+    }
+
+    int *B_EDT = (int *)malloc(sizeof(int) * nElements);
+    memset(B_EDT, 0, sizeof(int) * nElements);
+
+    int *g = (int *)malloc(sizeof(int) * nElements);
+    memset(g, 0, sizeof(int) * nElements);
+
+#pragma omp parallel
+    {
+        // local DT, s, and t for each column scan (fixed row)
+        int *s = (int *)malloc(sizeof(int) * width);
+        int *t = (int *)malloc(sizeof(int) * width);
+        memset(s, 0, sizeof(int) * width);
+        memset(t, 0, sizeof(int) * width);
+// phase 1
+#pragma omp for schedule(auto)
+        for (int j = 0; j < width; j++)
+        {
+            int offset = j;
+            pass12_2D(B_ext, g, height, width, offset, primaryPhase);
+        }
+// phase 2
+#pragma omp for schedule(auto)
+        for (int row = 0; row < height; row++)
+        {
+            int offset = row;
+            pass34_2D(g, B_EDT, width, offset, s, t);
+        }
+        free(s);
+        free(t);
+    }
+
+    // deconstruct B_EDT into target EDT
+
+    for(int index = 0; index < nElements/4; index++)
+    {
+        // get index for real array
+        int col, row;
+        row = (index) / realWidth;
+        col = index - row * realWidth;
+
+        // tranform it into the index for the extended array
+        int extCol, extRow;
+        extCol = col + realWidth/2;
+        extRow = row + realHeight/2;
+
+        // Transfer EDT
+        targetEDT[index] = B_EDT[extRow * width + extCol];
+    }
+
+    // Memory management
+    free(B_EDT);
+    free(B_ext);
+
+    free(g);
+
+    return;
+}
+
 void pMeijster3D(bool *targetArray,
                  float *targetEDT,
                  sizeInfo *structureInfo,
@@ -1168,7 +1340,7 @@ void ParticleLabel3D(int rMin,
 
  --------------------------------------------------------*/
 
-int partSD_2D(options *opts,
+double partSD_2D(options *opts,
               sizeInfo2D *info,
               char *P,
               char POI)
@@ -1181,7 +1353,7 @@ int partSD_2D(options *opts,
             - pointer to phase-array
             - char phase of interest
         Outputs:
-            - None.
+            - t50.
         Function will calculate particle size distribution of array P.
     */
 
@@ -1204,18 +1376,25 @@ int partSD_2D(options *opts,
 
     // Array for storing radii
 
-    int *R;
+    int *R = (int *)malloc(sizeof(int) * info->nElements);
     int *L;
 
     if (opts->partLabel)
     {
-        R = (int *)malloc(sizeof(int) * info->nElements);
         L = (int *)malloc(sizeof(int) * info->nElements);
 
         for (int i = 0; i < info->nElements; i++)
         {
             R[i] = -1;
             L[i] = -1;
+        }
+    }
+    else
+    {
+        // this avoids redundant loops
+        for (int i = 0; i < info->nElements; i++)
+        {
+            R[i] = -1;
         }
     }
 
@@ -1251,7 +1430,15 @@ int partSD_2D(options *opts,
 
     // EDT for dilation is a one time operation
 
-    pMeijster2D(B, EDT_D, info, 0); // 0 is the phase that will be dilated
+    if(opts->PB)
+    {
+        pMeijster2D_PB(B, EDT_D, info, 0); // 0 is the phase that will be dilated
+    }
+    else
+    {
+        pMeijster2D(B, EDT_D, info, 0); // 0 is the phase that will be dilated
+    }
+    
 
     int radius;
 
@@ -1281,8 +1468,14 @@ int partSD_2D(options *opts,
         memcpy(E, D, sizeof(bool) * info->nElements);
 
         // Meijster in D
-
-        pMeijster2D(D, EDT_E, info, 1);
+        if(opts->PB)
+        {
+            pMeijster2D_PB(D, EDT_E, info, 1);
+        }
+        else
+        {
+            pMeijster2D(D, EDT_E, info, 1);
+        }
 
 // Update E
 #pragma omp parallel for schedule(auto)
@@ -1301,9 +1494,6 @@ int partSD_2D(options *opts,
             p_sum += B[i];
             d_sum += D[i];
             e_sum += E[i];
-
-            if (!opts->partLabel)
-                continue;
 
             if (P[i] - E[i] == 1 && R[i] == -1)
                 R[i] = radius;
@@ -1329,15 +1519,19 @@ int partSD_2D(options *opts,
     long int sum_removed = 0;
     double *partRemoved = (double *)malloc(sizeof(double) * (lastR - opts->radOff));
 
-    // get particles removed at R = 1
+    memset(partRemoved, 0, sizeof(double) * (lastR - opts->radOff));
 
-    partRemoved[0] = PDE_sum[0 * 3 + 0] - PDE_sum[0 * 3 + 2];
-    sum_removed += (int)partRemoved[0];
-
-    for (int i = 1; i < (lastR - opts->radOff); i++)
+    for(long int index = 0; index < info->nElements; index++)
     {
-        partRemoved[i] = PDE_sum[(i - 1) * 3 + 2] - PDE_sum[i * 3 + 2];
-        sum_removed += (int)partRemoved[i];
+        if(P[index] == POI && R[index] != -1)
+        {
+            partRemoved[R[index]]++;
+        }
+    }
+
+    for(int i = 0; i < (lastR - opts->radOff); i++)
+    {
+        sum_removed += partRemoved[i];
     }
 
     // correction for radius offset
@@ -1353,6 +1547,15 @@ int partSD_2D(options *opts,
         fprintf(partSD_OUT, "%d,%lf\n", i + 1 + correction, (double)partRemoved[i] / sum_removed);
     }
 
+    double t50 = 0.0;
+    double p = 0.0;
+
+    for(int i = 0; i < (lastR - opts->radOff); i++)
+    {
+        p = (double)partRemoved[i] / sum_removed;
+        t50 += p*(2*(i + 1 + correction));
+    }
+
     fclose(partSD_OUT);
 
     // partial memory management
@@ -1366,7 +1569,6 @@ int partSD_2D(options *opts,
     {
         ParticleLabel2D(opts->radOff, lastR, R, L, info);
         saveLabels2D(R, L, info, opts->partLabel_Out);
-        free(R);
         free(L);
     }
 
@@ -1379,10 +1581,12 @@ int partSD_2D(options *opts,
     free(E);
     free(D);
 
-    return 0;
+    free(R);
+
+    return t50;
 }
 
-int poreSD_2D(options *opts,
+double poreSD_2D(options *opts,
               sizeInfo2D *info,
               char *P,
               char POI)
@@ -1395,7 +1599,7 @@ int poreSD_2D(options *opts,
             - pointer to phase-array
             - char phase of interest
         Outputs:
-            - None.
+            - d50.
         Function will calculate pore size distribution of array P.
     */
 
@@ -1418,18 +1622,25 @@ int poreSD_2D(options *opts,
 
     // Array for storing radii
 
-    int *R;
+    int *R = (int *)malloc(sizeof(int) * info->nElements);
     int *L;
 
     if (opts->poreLabel)
     {
-        R = (int *)malloc(sizeof(int) * info->nElements);
         L = (int *)malloc(sizeof(int) * info->nElements);
 
         for (int i = 0; i < info->nElements; i++)
         {
             R[i] = -1;
             L[i] = -1;
+        }
+    }
+    else
+    {
+        // this avoids redundant loops
+        for (int i = 0; i < info->nElements; i++)
+        {
+            R[i] = -1;
         }
     }
 
@@ -1460,8 +1671,14 @@ int poreSD_2D(options *opts,
     }
 
     // EDT for dilation is a one time operation
-
-    pMeijster2D(B, EDT_D, info, 0); // 0 is the phase that will be dilated
+    if(opts->PB)
+    {
+        pMeijster2D_PB(B, EDT_D, info, 0);
+    }
+    else
+    {
+        pMeijster2D(B, EDT_D, info, 0); // 0 is the phase that will be dilated
+    }
 
     int radius = 1;
 
@@ -1491,8 +1708,14 @@ int poreSD_2D(options *opts,
         memcpy(E, D, sizeof(bool) * info->nElements);
 
         // Meijster in D
-
-        pMeijster2D(D, EDT_E, info, 1);
+        if (opts->PB)
+        {
+            pMeijster2D_PB(D, EDT_E, info, 1);
+        }
+        else
+        {
+            pMeijster2D(D, EDT_E, info, 1);
+        }        
 
 // Update E
 #pragma omp parallel for schedule(auto)
@@ -1511,9 +1734,6 @@ int poreSD_2D(options *opts,
             p_sum += B[i];
             d_sum += D[i];
             e_sum += E[i];
-
-            if (!opts->poreLabel)
-                continue;
 
             if (B[i] - E[i] == 1 && R[i] == -1)
                 R[i] = radius;
@@ -1538,15 +1758,19 @@ int poreSD_2D(options *opts,
     long int sum_removed = 0;
     double *poreRemoved = (double *)malloc(sizeof(double) * (lastR - opts->radOff));
 
-    // get particles removed at R = 1
+    memset(poreRemoved, 0, sizeof(double) * (lastR - opts->radOff));
 
-    poreRemoved[0] = PDE_sum[0 * 3 + 0] - PDE_sum[0 * 3 + 2];
-    sum_removed += (int)poreRemoved[0];
-
-    for (int i = 1; i < (lastR - opts->radOff); i++)
+    for(long int index = 0; index < info->nElements; index++)
     {
-        poreRemoved[i] = PDE_sum[(i - 1) * 3 + 2] - PDE_sum[i * 3 + 2];
-        sum_removed += (int)poreRemoved[i];
+        if(P[index] == POI && R[index] != -1)
+        {
+            poreRemoved[R[index]]++;
+        }
+    }
+
+    for(int i = 0; i < (lastR - opts->radOff); i++)
+    {
+        sum_removed += poreRemoved[i];
     }
 
     // correction for radius offset
@@ -1564,6 +1788,15 @@ int poreSD_2D(options *opts,
 
     fclose(poreSD_OUT);
 
+    double d50 = 0.0;
+    double p = 0.0;
+
+    for(int i = 0; i < (lastR - opts->radOff); i++)
+    {
+        p = (double)poreRemoved[i] / sum_removed;
+        d50 += p*(2*(i + 1 + correction));
+    }
+
     // partial memory management
 
     free(poreRemoved);
@@ -1575,7 +1808,6 @@ int poreSD_2D(options *opts,
     {
         ParticleLabel2D(opts->radOff, lastR, R, L, info);
         saveLabels2D(R, L, info, opts->poreLabel_Out);
-        free(R);
         free(L);
     }
 
@@ -1588,7 +1820,9 @@ int poreSD_2D(options *opts,
     free(E);
     free(D);
 
-    return 0;
+    free(R);
+
+    return d50;
 }
 
 int partSD_3D(options *opts,
@@ -2083,11 +2317,49 @@ int Sim2D(options *opts)
 
     // Perform the selected simulations
 
+    double t50, d50;
+
     if (opts->partSD)
-        partSD_2D(opts, &imgInfo, P, 1);
+        t50 = partSD_2D(opts, &imgInfo, P, 1);
+
 
     if (opts->poreSD)
-        poreSD_2D(opts, &imgInfo, P, 0);
+        d50 = poreSD_2D(opts, &imgInfo, P, 0);
+
+    if(opts->batch)
+    {
+        // check if file exists
+        bool fileFlag = true;
+        if (FILE *BATCH = fopen(opts->batchName, "r"))
+        {
+            fclose(BATCH);
+            fileFlag = false;
+        }
+        
+        // open file in append mode and add stuff
+
+        FILE *BATCH = fopen(opts->batchName, "a+");
+
+        // print d50 and t50
+        if (opts->partLabel && !opts->poreLabel)
+        {
+            if(fileFlag)
+                fprintf(BATCH, "t50\n");
+            fprintf(BATCH, "%1.3e\n", t50);
+        }else if(!opts->partLabel && opts->poreLabel)
+        {
+            if(fileFlag)
+                fprintf(BATCH, "d50\n");
+            fprintf(BATCH, "%1.3e\n", d50);
+        }else
+        {
+            if(fileFlag)
+                fprintf(BATCH, "d50,t50\n");
+            fprintf(BATCH, "%1.3e,%1.3e\n", d50, t50);
+        }
+
+        fclose(BATCH);
+    }
 
     // Memory Management
     free(P);
@@ -2178,5 +2450,54 @@ int Sim3D(options *opts)
 
     free(P);
 
+    return 0;
+}
+
+
+int batchSim2D(options *opts)
+{
+    /*
+        Function batchSim2D:
+        Input:
+            - opts struct
+        Outputs:
+            - none
+        
+        Function will run a batch of 2D simulations based on the user entered input.
+    */
+
+    int nSim = opts->nFiles;
+
+    for (int n = 0; n < nSim; n++)
+    {
+        // Adjust input and output filenames
+
+        sprintf(opts->inputFilename, "%0*d.jpg", opts->LeadZero, n);
+
+        if(opts->partSD)
+        {
+            sprintf(opts->partSD_Out, "PartSD_%0*d.csv", opts->LeadZero, n);
+            if(opts->partLabel)
+            {
+                sprintf(opts->partLabel_Out, "PartLabel_%0*d.csv", opts->LeadZero, n);
+            }
+        }
+
+        if(opts->poreSD)
+        {
+            sprintf(opts->poreSD_Out, "PoreSD_%0*d.csv", opts->LeadZero, n);
+            if(opts->poreLabel)
+            {
+                sprintf(opts->poreLabel_Out, "PoreLabel_%0*d.csv", opts->LeadZero, n);
+            }
+        }
+
+        if (opts->verbose)
+            printf("%s\n", opts->inputFilename);
+
+        // Run Simulation
+        Sim2D(opts);
+    }
+    
     return 0;
 }

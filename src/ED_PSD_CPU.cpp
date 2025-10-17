@@ -44,11 +44,11 @@ int main(void)
         }
     } else
     {
-        Sim2D(&opts);
+        if(opts.nD == 2)
+            Sim2D(&opts);
+        else
+            Sim3D(&opts);
     }
-    
-    if (opts.nD == 3)
-        Sim3D(&opts);
 
     return 0;
 }

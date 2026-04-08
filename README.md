@@ -53,6 +53,7 @@ Additionally, you may want to consider checking out other publications that used
 - Adam, A., Wang, F., & Li, X. (2022). Efficient reconstruction and validation of heterogeneous microstructures for energy applications. International Journal of Energy Research. https://doi.org/10.1002/er.8578
 - Adam, A., Stallard, S.L., Fang, H. et al. A General Framework for Predicting Permeability in Porous Structures Using Convolutional Neural Networks with Error Estimation. Transp Porous Med 152, 100 (2025). https://doi.org/10.1007/s11242-025-02239-4
 - Kim, C., Li, Y., Adam, A., Wu, W., Parker, G., Jang, I., Ahn, Y., Su, Y.-F., Meyer, H. M., III, Yu, X.-Y., Nanda, J., & Yang, G. (2026). Self-generated phosphate/oxysulfide passivation from dry-processed single-crystal NMC811 stabilizes argyrodite sulfide interfaces. Energy Storage Materials, 105009. https://doi.org/10.1016/j.ensm.2026.105009
+- Stallard, S., Adam, A., Yang, G., Bergman, T. L., & Li, X. (2026). Categorization of congruent TPMS by geometric features using manifold learning and clustering. Computational Materials Science, 268, 114667. https://doi.org/10.1016/j.commatsci.2026.114667 
 
 **If you used ED-cPSD as part of a publication and would like it to be featured here, please let one of the authors know!**
 
